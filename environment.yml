@@ -1,0 +1,17 @@
+name: hexapod_brain
+channels:
+  - conda-forge
+  - robostack-humble
+  - pytorch
+dependencies:
+  - python=3.10
+  - ros-humble-desktop
+  - ros-humble-cv-bridge
+  - ros-humble-vision-msgs
+  - pytorch
+  - torchvision
+  - cpuonly  # For Pi (remove if GPU available)
+  - ultralytics
+  - pip
+  - pip:
+    - opencv-python
