@@ -78,6 +78,30 @@ source /opt/ros/humble/setup.bash
 - `/raspclaws_node` - Main hardware control node
 - `/camera_publisher` - ZMQ-to-ROS2 camera bridge
 
+#### Services (Control)
+**IMPORTANT**: Camera is paused by default to save resources. Must be explicitly enabled before use.
+
+- **Enable Camera Stream**:
+  ```bash
+  ros2 service call /raspclaws/set_camera_pause std_srvs/srv/SetBool "{data: false}"
+  ```
+  
+- **Disable Camera Stream** (pause to save resources):
+  ```bash
+  ros2 service call /raspclaws/set_camera_pause std_srvs/srv/SetBool "{data: true}"
+  ```
+
+- **Enable Servos** (exit standby mode):
+  ```bash
+  ros2 service call /raspclaws/set_servo_standby std_srvs/srv/SetBool "{data: false}"
+  ```
+  Note: Servos automatically activate when receiving movement commands.
+
+- **Disable Servos** (enter standby - servos become soft):
+  ```bash
+  ros2 service call /raspclaws/set_servo_standby std_srvs/srv/SetBool "{data: true}"
+  ```
+
 ### Key Packages
 1.  **`hexapod_vision`**:
     -   **Node**: `yolo_detector`
