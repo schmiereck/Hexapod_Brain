@@ -1,0 +1,23 @@
+bottle_seeker:
+  ros__parameters:
+    # Detection
+    target_class: "bottle"
+    min_confidence: 0.5
+    
+    # Camera/Head
+    head_scan_positions: [-60.0, -30.0, 0.0, 30.0, 60.0]  # degrees
+    head_scan_delay: 2.0  # seconds per position
+    
+    # Centering
+    image_width: 640  # from YOLO input size
+    center_tolerance: 0.2  # 40% center zone (0.4-0.6)
+    rotation_step: 15.0  # degrees per adjustment
+    
+    # Approaching
+    approach_distance: 0.1  # meters per step
+    min_bottle_width: 30.0  # pixels (far away)
+    goal_bottle_width: 120.0  # pixels (close enough)
+    
+    # Timeouts
+    search_timeout: 60.0  # seconds
+    detection_lost_timeout: 3.0  # seconds
