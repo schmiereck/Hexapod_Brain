@@ -2,6 +2,8 @@
 
 This repository contains the high-level intelligence code for the Adeept RaspClaws robot, designed to run on a separate compute node (e.g., Raspberry Pi 5 "ubuntu1") using ROS 2 Humble.
 
+Read `AGENTS.md` to learn about your behavior.
+
 ## Build, Test, and Lint
 
 ### Build
