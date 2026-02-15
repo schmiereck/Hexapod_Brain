@@ -309,17 +309,17 @@ class BottleSeeker(Node):
         self.publish_status('ARRIVED')
         self.get_logger().info('🎉 MISSION COMPLETE! Bottle reached!')
         
-        # Celebrate with head wiggle (optional)
+        # Celebrate with head wiggle (keep tilt at forward-looking angle)
         for _ in range(3):
             goal = HeadPosition.Goal()
             goal.pan_degrees = 30.0
-            goal.tilt_degrees = 0.0
+            goal.tilt_degrees = self.head_tilt_angle  # Keep looking forward!
             goal.smooth = True
             self.head_client.send_goal_async(goal)
             time.sleep(0.5)
             
             goal.pan_degrees = -30.0
-            goal.tilt_degrees = 0.0
+            goal.tilt_degrees = self.head_tilt_angle  # Keep looking forward!
             goal.smooth = True
             self.head_client.send_goal_async(goal)
             time.sleep(0.5)
@@ -327,7 +327,7 @@ class BottleSeeker(Node):
         # Center head
         goal = HeadPosition.Goal()
         goal.pan_degrees = 0.0
-        goal.tilt_degrees = 0.0
+        goal.tilt_degrees = self.head_tilt_angle  # Keep looking forward!
         goal.smooth = True
         self.head_client.send_goal_async(goal)
         
