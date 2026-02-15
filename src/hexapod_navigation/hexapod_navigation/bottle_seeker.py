@@ -56,6 +56,7 @@ class BottleSeeker(Node):
         self.goal_bottle_width = self.get_parameter('goal_bottle_width').value
         self.search_timeout = self.get_parameter('search_timeout').value
         self.detection_lost_timeout = self.get_parameter('detection_lost_timeout').value
+        self.stabilization_delay = self.get_parameter('stabilization_delay').value
         
         # State machine
         self.state = State.SEARCHING
@@ -64,6 +65,7 @@ class BottleSeeker(Node):
         self.start_time = time.time()
         self.last_scan_time = 0.0  # Time when last scan position was set
         self.action_in_progress = False  # Flag to prevent multiple action commands
+        self.last_action_time = 0.0  # Time when last action completed
         
         # Current bottle info
         self.bottle_bbox = None
@@ -215,8 +217,9 @@ class BottleSeeker(Node):
         if self.bottle_bbox is None:
             return
         
-        # Don't send new command if action in progress
-        if self.action_in_progress:
+        # Don't send new command if action in progress or waiting for stabilization
+        current_time = time.time()
+        if self.action_in_progress or (current_time - self.last_action_time) < self.stabilization_delay:
             return
         
         bottle_x = self.bottle_bbox.center.position.x
@@ -235,7 +238,7 @@ class BottleSeeker(Node):
             goal.use_imu = True
             self.action_in_progress = True
             future = self.rotate_client.send_goal_async(goal)
-            future.add_done_callback(lambda f: setattr(self, 'action_in_progress', False))
+            future.add_done_callback(self._on_action_complete)
         elif bottle_x > right_threshold:
             # Bottle is right, rotate right (POSITIVE angle)
             self.get_logger().info(f'Bottle RIGHT of center. Rotating RIGHT ({self.rotation_step}°)')
@@ -246,7 +249,7 @@ class BottleSeeker(Node):
             goal.use_imu = True
             self.action_in_progress = True
             future = self.rotate_client.send_goal_async(goal)
-            future.add_done_callback(lambda f: setattr(self, 'action_in_progress', False))
+            future.add_done_callback(self._on_action_complete)
         else:
             # Bottle is centered
             self.get_logger().info(f'Bottle CENTERED at x={bottle_x:.0f}')
@@ -259,8 +262,9 @@ class BottleSeeker(Node):
         if self.bottle_bbox is None:
             return
         
-        # Don't send new command if action in progress
-        if self.action_in_progress:
+        # Don't send new command if action in progress or waiting for stabilization
+        current_time = time.time()
+        if self.action_in_progress or (current_time - self.last_action_time) < self.stabilization_delay:
             return
         
         bottle_width = self.bottle_bbox.size_x
@@ -291,7 +295,13 @@ class BottleSeeker(Node):
         goal.step_size_cm = 2.0
         self.action_in_progress = True
         future = self.linear_client.send_goal_async(goal)
-        future.add_done_callback(lambda f: setattr(self, 'action_in_progress', False))
+        future.add_done_callback(self._on_action_complete)
+    
+    def _on_action_complete(self, future):
+        """Callback when action completes, starts stabilization delay."""
+        self.action_in_progress = False
+        self.last_action_time = time.time()
+        self.get_logger().info(f'Action complete, stabilizing for {self.stabilization_delay}s')
     
     def state_arrived(self):
         """Mission complete."""
