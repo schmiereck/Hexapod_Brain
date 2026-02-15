@@ -17,7 +17,7 @@ bottle_seeker:
     # Approaching
     approach_distance: 0.1  # meters per step
     min_bottle_width: 30.0  # pixels (far away)
-    goal_bottle_width: 120.0  # pixels (close enough)
+    goal_bottle_width: 50.0  # pixels (close enough - reduced from 120px)
     
     # Timeouts
     search_timeout: 120.0  # seconds (increased from 60 to give more time)

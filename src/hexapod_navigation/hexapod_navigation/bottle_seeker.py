@@ -63,6 +63,7 @@ class BottleSeeker(Node):
         self.last_detection_time = None
         self.start_time = time.time()
         self.last_scan_time = 0.0  # Time when last scan position was set
+        self.action_in_progress = False  # Flag to prevent multiple action commands
         
         # Current bottle info
         self.bottle_bbox = None
@@ -214,28 +215,38 @@ class BottleSeeker(Node):
         if self.bottle_bbox is None:
             return
         
+        # Don't send new command if action in progress
+        if self.action_in_progress:
+            return
+        
         bottle_x = self.bottle_bbox.center.position.x
         left_threshold = self.image_width * (0.5 - self.center_tolerance)
         right_threshold = self.image_width * (0.5 + self.center_tolerance)
         
+        self.get_logger().info(f'Centering: bottle_x={bottle_x:.0f}, thresholds=[{left_threshold:.0f}, {right_threshold:.0f}]')
+        
         if bottle_x < left_threshold:
-            # Bottle is left, rotate left
-            self.get_logger().info(f'Bottle at x={bottle_x:.0f} (LEFT). Rotating {-self.rotation_step}°')
+            # Bottle is left, rotate left (NEGATIVE angle)
+            self.get_logger().info(f'Bottle LEFT of center. Rotating LEFT ({-self.rotation_step}°)')
             goal = Rotate.Goal()
             goal.angle_degrees = -self.rotation_step
             goal.speed = 40.0
             goal.step_size_deg = 5.0
             goal.use_imu = True
-            self.rotate_client.send_goal_async(goal)
+            self.action_in_progress = True
+            future = self.rotate_client.send_goal_async(goal)
+            future.add_done_callback(lambda f: setattr(self, 'action_in_progress', False))
         elif bottle_x > right_threshold:
-            # Bottle is right, rotate right
-            self.get_logger().info(f'Bottle at x={bottle_x:.0f} (RIGHT). Rotating {self.rotation_step}°')
+            # Bottle is right, rotate right (POSITIVE angle)
+            self.get_logger().info(f'Bottle RIGHT of center. Rotating RIGHT ({self.rotation_step}°)')
             goal = Rotate.Goal()
             goal.angle_degrees = self.rotation_step
             goal.speed = 40.0
             goal.step_size_deg = 5.0
             goal.use_imu = True
-            self.rotate_client.send_goal_async(goal)
+            self.action_in_progress = True
+            future = self.rotate_client.send_goal_async(goal)
+            future.add_done_callback(lambda f: setattr(self, 'action_in_progress', False))
         else:
             # Bottle is centered
             self.get_logger().info(f'Bottle CENTERED at x={bottle_x:.0f}')
@@ -246,6 +257,10 @@ class BottleSeeker(Node):
         self.publish_status('APPROACHING')
         
         if self.bottle_bbox is None:
+            return
+        
+        # Don't send new command if action in progress
+        if self.action_in_progress:
             return
         
         bottle_width = self.bottle_bbox.size_x
@@ -274,7 +289,9 @@ class BottleSeeker(Node):
         goal.distance_cm = distance_cm
         goal.speed = 40.0
         goal.step_size_cm = 2.0
-        self.linear_client.send_goal_async(goal)
+        self.action_in_progress = True
+        future = self.linear_client.send_goal_async(goal)
+        future.add_done_callback(lambda f: setattr(self, 'action_in_progress', False))
     
     def state_arrived(self):
         """Mission complete."""
