@@ -20,5 +20,5 @@ bottle_seeker:
     goal_bottle_width: 120.0  # pixels (close enough)
     
     # Timeouts
-    search_timeout: 60.0  # seconds
+    search_timeout: 120.0  # seconds (increased from 60 to give more time)
     detection_lost_timeout: 3.0  # seconds

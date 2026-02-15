@@ -126,8 +126,10 @@ class BottleSeeker(Node):
         # Check for timeout
         elapsed = time.time() - self.start_time
         if elapsed > self.search_timeout:
-            self.get_logger().error('Search timeout reached!')
+            self.get_logger().error('Search timeout reached! Shutting down.')
             self.publish_status('TIMEOUT')
+            self.timer.cancel()
+            rclpy.shutdown()
             return
         
         # Check for detection loss (except in SEARCHING state)
