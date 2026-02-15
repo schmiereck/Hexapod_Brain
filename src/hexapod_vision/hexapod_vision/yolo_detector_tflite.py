@@ -1,3 +1,8 @@
+import os
+# Fix XNNPACK illegal instruction on Raspberry Pi 5
+os.environ['XNNPACK_DELEGATE_FLAGS'] = '0'
+print(f"DEBUG: XNNPACK_DELEGATE_FLAGS set to: {os.environ.get('XNNPACK_DELEGATE_FLAGS')}")
+
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Image, CompressedImage
@@ -124,21 +129,20 @@ class YOLODetectorTFLite(Node):
         # Transpose from [1, 84, 8400] to [8400, 84]
         predictions = output[0].T  # Now shape is [8400, 84]
         
+        # DEBUG: Log statistics about ALL predictions BEFORE threshold
+        all_class_scores = predictions[:, 4:]  # Shape: [8400, 80]
+        max_scores_per_box = all_class_scores.max(axis=1)  # Max score for each of 8400 boxes
+        self.get_logger().info(f'DEBUG: All 8400 boxes - max scores: min={max_scores_per_box.min():.6f}, max={max_scores_per_box.max():.6f}, mean={max_scores_per_box.mean():.6f}')
+        self.get_logger().info(f'DEBUG: Top 5 box max scores: {np.sort(max_scores_per_box)[-5:]}')
+        self.get_logger().info(f'DEBUG: Boxes above 0.5: {(max_scores_per_box > 0.5).sum()}, above 0.3: {(max_scores_per_box > 0.3).sum()}, above 0.1: {(max_scores_per_box > 0.1).sum()}')
+        
         max_conf_seen = 0.0  # Debug: track max confidence
-        for pred in predictions:
+        for i, pred in enumerate(predictions):
             # Extract box coordinates (first 4 values) - already in 640x640 pixel space
             x_center, y_center, width, height = pred[:4]
             
-            # YOLOv8 has NO objectness score, only class scores (as logits)
-            class_logits = pred[4:]  # 80 class logits
-            
-            # DEBUG: Log raw logit values for first few detections with more precision
-            if len(detections) < 3:
-                self.get_logger().info(f'DEBUG: class_logits min={class_logits.min():.6f}, max={class_logits.max():.6f}, mean={class_logits.mean():.6f}, std={class_logits.std():.6f}')
-                self.get_logger().info(f'DEBUG: First 10 logits: {class_logits[:10]}')
-            
-            # Apply sigmoid to convert logits to probabilities
-            class_scores = 1 / (1 + np.exp(-class_logits))
+            # YOLOv8 TFLite output is already sigmoid-activated (NOT logits!)
+            class_scores = pred[4:]  # 80 class probabilities [0,1]
             
             # Get class with highest score
             class_id = np.argmax(class_scores)
@@ -375,6 +379,9 @@ class YOLODetectorTFLite(Node):
 
 
 def main(args=None):
+    # MUST be set before tflite import happens anywhere
+    os.environ['XNNPACK_DELEGATE_FLAGS'] = '0'
+    
     rclpy.init(args=args)
     node = YOLODetectorTFLite()
     try:
