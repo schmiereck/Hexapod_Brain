@@ -41,6 +41,7 @@ class BottleSeeker(Node):
         self.declare_parameter('goal_bottle_width', 120.0)
         self.declare_parameter('search_timeout', 60.0)
         self.declare_parameter('detection_lost_timeout', 3.0)
+        self.declare_parameter('stabilization_delay', 1.0)
         
         # Get parameters
         self.target_classes = self.get_parameter('target_classes').value
