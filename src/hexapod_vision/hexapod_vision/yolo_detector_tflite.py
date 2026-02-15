@@ -132,6 +132,10 @@ class YOLODetectorTFLite(Node):
             # YOLOv8 has NO objectness score, only class scores (as logits)
             class_logits = pred[4:]  # 80 class logits
             
+            # DEBUG: Log raw logit values for first few detections
+            if len(detections) < 3:
+                self.get_logger().info(f'DEBUG: class_logits min={class_logits.min():.3f}, max={class_logits.max():.3f}, mean={class_logits.mean():.3f}')
+            
             # Apply sigmoid to convert logits to probabilities
             class_scores = 1 / (1 + np.exp(-class_logits))
             
