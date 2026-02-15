@@ -176,10 +176,19 @@ class BottleSeeker(Node):
             time.sleep(self.head_scan_delay)
             self.current_scan_index += 1
         else:
-            # Completed full head scan, rotate robot
-            self.get_logger().info('Full head scan complete. Rotating robot 30°...')
-            self.current_scan_index = 0
+            # Completed full head scan, rotate robot and reset head
+            self.get_logger().info('Full head scan complete. Centering head and rotating robot 30°...')
             
+            # First, center the head
+            goal = HeadPosition.Goal()
+            goal.pan_degrees = 0.0
+            goal.tilt_degrees = self.head_tilt_angle
+            goal.smooth = True
+            self.head_client.send_goal_async(goal)
+            time.sleep(1.0)  # Wait for head to center
+            
+            # Then rotate robot
+            self.current_scan_index = 0
             goal = Rotate.Goal()
             goal.angle_degrees = 30.0
             goal.speed = 40.0
