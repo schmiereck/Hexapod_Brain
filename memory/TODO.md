@@ -9,34 +9,22 @@
 *   [x] Package builds successfully on ubuntu1
 *   [x] ROS2 services verified on raspclaws-1 (gui_server, ros_server)
 *   [x] ROS2 topics and actions verified on ubuntu1
+*   [x] **YOLOv8n TFLite model downloaded and uploaded to ubuntu1**
+*   [x] **TFLite detector successfully starts and loads model**
 
-## 📝 Current TODOs (Phase 1 - Final Step)
-1.  **Create YOLOv8 TFLite Model**:
-    - **Option A** (Preferred): Convert on Windows PC with working PyTorch
-      - Fix ONNX dependencies issue in `scripts/export_yolo_tflite.py`
-      - Or use online conversion tool
-    - **Option B**: Download pre-converted YOLOv8n TFLite model from community
-    - See `src/hexapod_vision/README_TFLITE.md` for details
+## 📝 Current TODOs (Phase 1 - Testing & Validation)
+1.  **Test with Live Camera Stream**:
+    - Ensure raspclaws-1 gui_server is publishing camera frames
+    - Run detector and verify detections: `ros2 topic echo /hexapod/detections`
+    - Check FPS and latency
 
-2.  **Upload Model to ubuntu1**:
-    ```bash
-    scp yolov8n_float32.tflite ubuntu@192.168.2.133:~/
-    ```
+2.  **Optimize if Needed**:
+    - If FPS is low (<5), consider lowering input_size parameter
+    - Test with compressed image stream instead of raw
 
-3.  **Test YOLOv8 TFLite Detector**:
-    ```bash
-    # On ubuntu1
-    export ROS_DOMAIN_ID=1
-    source /opt/ros/humble/setup.bash
-    cd ~/Hexapod_Brain
-    source install/setup.bash
-    ros2 launch hexapod_vision yolo_detector_tflite.launch.py
-    ```
-
-4.  **Verify Detections**:
-    ```bash
-    ros2 topic echo /hexapod/detections
-    ```
+3.  **Documentation Update**:
+    - Document successful TFLite setup in README
+    - Add model download instructions
 
 ## 📋 Next Phase (Phase 2 - Navigation)
 1.  **Create hexapod_navigation Package**:
