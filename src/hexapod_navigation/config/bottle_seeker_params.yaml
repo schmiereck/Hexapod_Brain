@@ -1,11 +1,12 @@
 bottle_seeker:
   ros__parameters:
     # Detection
-    target_class: "bottle"
+    target_classes: ["bottle", "person"]  # Accept multiple object types
     min_confidence: 0.5
     
     # Camera/Head
-    head_scan_positions: [-60.0, -30.0, 0.0, 30.0, 60.0]  # degrees
+    head_scan_positions: [-60.0, -30.0, 0.0, 30.0, 60.0]  # pan degrees (left-right)
+    head_tilt_angle: -60.0  # tilt degrees (negative = look down/forward, -67.0 is max down)
     head_scan_delay: 2.0  # seconds per position
     
     # Centering

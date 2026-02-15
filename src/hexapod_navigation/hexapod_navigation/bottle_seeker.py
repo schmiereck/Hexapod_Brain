@@ -28,9 +28,10 @@ class BottleSeeker(Node):
         super().__init__('bottle_seeker')
         
         # Declare parameters
-        self.declare_parameter('target_class', 'bottle')
+        self.declare_parameter('target_classes', ['bottle', 'person'])
         self.declare_parameter('min_confidence', 0.5)
         self.declare_parameter('head_scan_positions', [-60.0, -30.0, 0.0, 30.0, 60.0])
+        self.declare_parameter('head_tilt_angle', -60.0)
         self.declare_parameter('head_scan_delay', 2.0)
         self.declare_parameter('image_width', 640)
         self.declare_parameter('center_tolerance', 0.2)
@@ -42,9 +43,10 @@ class BottleSeeker(Node):
         self.declare_parameter('detection_lost_timeout', 3.0)
         
         # Get parameters
-        self.target_class = self.get_parameter('target_class').value
+        self.target_classes = self.get_parameter('target_classes').value
         self.min_confidence = self.get_parameter('min_confidence').value
         self.head_scan_positions = self.get_parameter('head_scan_positions').value
+        self.head_tilt_angle = self.get_parameter('head_tilt_angle').value
         self.head_scan_delay = self.get_parameter('head_scan_delay').value
         self.image_width = self.get_parameter('image_width').value
         self.center_tolerance = self.get_parameter('center_tolerance').value
@@ -91,18 +93,20 @@ class BottleSeeker(Node):
         # Main control loop
         self.timer = self.create_timer(0.1, self.control_loop)
         
-        self.get_logger().info(f'Bottle Seeker initialized. Searching for: {self.target_class}')
+        self.get_logger().info(f'Bottle Seeker initialized. Searching for: {", ".join(self.target_classes)}')
     
     def detection_callback(self, msg: Detection2DArray):
         """Process incoming detections."""
         self.bottle_bbox = None
+        detected_class = None
         
-        # Look for target object
+        # Look for target objects
         for detection in msg.detections:
             for result in detection.results:
-                if result.hypothesis.class_id == self.target_class:
+                if result.hypothesis.class_id in self.target_classes:
                     if result.hypothesis.score >= self.min_confidence:
                         self.bottle_bbox = detection.bbox
+                        detected_class = result.hypothesis.class_id
                         self.last_detection_time = time.time()
                         
                         # Publish target position
@@ -110,6 +114,9 @@ class BottleSeeker(Node):
                         target.x = detection.bbox.center.position.x
                         target.y = detection.bbox.center.position.y
                         self.target_pub.publish(target)
+                        
+                        if detected_class:
+                            self.get_logger().info(f'Detected: {detected_class} (score={result.hypothesis.score:.2f})', throttle_duration_sec=2.0)
                         break
             if self.bottle_bbox:
                 break
@@ -144,9 +151,9 @@ class BottleSeeker(Node):
         """Scan for bottle with head movement."""
         self.publish_status('SEARCHING')
         
-        # Check if bottle found
+        # Check if target object found
         if self.bottle_bbox is not None:
-            self.get_logger().info(f'{self.target_class.upper()} DETECTED!')
+            self.get_logger().info('TARGET OBJECT DETECTED!')
             self.transition_to(State.CENTERING)
             return
         
@@ -158,7 +165,7 @@ class BottleSeeker(Node):
             # Send head position goal
             goal = HeadPosition.Goal()
             goal.pan_degrees = pan_angle
-            goal.tilt_degrees = 0.0
+            goal.tilt_degrees = self.head_tilt_angle
             goal.smooth = True
             
             self.head_client.send_goal_async(goal)
