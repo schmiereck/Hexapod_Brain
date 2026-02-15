@@ -1,7 +1,7 @@
 bottle_seeker:
   ros__parameters:
     # Detection
-    target_classes: ["bottle", "person"]  # Accept multiple object types
+    target_classes: ["bottle"]  # Only search for bottle (not person)
     min_confidence: 0.5
     
     # Camera/Head
