@@ -12,7 +12,7 @@
   <depend>geometry_msgs</depend>
   <depend>std_msgs</depend>
   <depend>action_msgs</depend>
-  <depend>raspclaws_msgs</depend>
+  <depend>raspclaws_interfaces</depend>
 
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>

@@ -12,7 +12,7 @@ from enum import Enum
 from vision_msgs.msg import Detection2DArray
 from geometry_msgs.msg import Point
 from std_msgs.msg import String
-from raspclaws_msgs.action import HeadPosition, Rotate, LinearMove
+from raspclaws_interfaces.action import HeadPosition, Rotate, LinearMove
 import time
 
 
@@ -157,8 +157,9 @@ class BottleSeeker(Node):
             
             # Send head position goal
             goal = HeadPosition.Goal()
-            goal.pan = pan_angle
-            goal.tilt = 0.0
+            goal.pan_degrees = pan_angle
+            goal.tilt_degrees = 0.0
+            goal.smooth = True
             
             self.head_client.send_goal_async(goal)
             
@@ -171,7 +172,10 @@ class BottleSeeker(Node):
             self.current_scan_index = 0
             
             goal = Rotate.Goal()
-            goal.angle = 30.0
+            goal.angle_degrees = 30.0
+            goal.speed = 40.0
+            goal.step_size_deg = 5.0
+            goal.use_imu = True
             self.rotate_client.send_goal_async(goal)
             time.sleep(2.0)  # Wait for rotation
     
@@ -190,14 +194,20 @@ class BottleSeeker(Node):
             # Bottle is left, rotate left
             self.get_logger().info(f'Bottle at x={bottle_x:.0f} (LEFT). Rotating {-self.rotation_step}°')
             goal = Rotate.Goal()
-            goal.angle = -self.rotation_step
+            goal.angle_degrees = -self.rotation_step
+            goal.speed = 40.0
+            goal.step_size_deg = 5.0
+            goal.use_imu = True
             self.rotate_client.send_goal_async(goal)
             time.sleep(1.5)
         elif bottle_x > right_threshold:
             # Bottle is right, rotate right
             self.get_logger().info(f'Bottle at x={bottle_x:.0f} (RIGHT). Rotating {self.rotation_step}°')
             goal = Rotate.Goal()
-            goal.angle = self.rotation_step
+            goal.angle_degrees = self.rotation_step
+            goal.speed = 40.0
+            goal.step_size_deg = 5.0
+            goal.use_imu = True
             self.rotate_client.send_goal_async(goal)
             time.sleep(1.5)
         else:
@@ -232,9 +242,12 @@ class BottleSeeker(Node):
             return
         
         # Move forward
-        self.get_logger().info(f'Moving forward {self.approach_distance}m (bottle width={bottle_width:.0f}px)')
+        distance_cm = self.approach_distance * 100.0  # Convert meters to cm
+        self.get_logger().info(f'Moving forward {distance_cm:.0f}cm (bottle width={bottle_width:.0f}px)')
         goal = LinearMove.Goal()
-        goal.distance = self.approach_distance
+        goal.distance_cm = distance_cm
+        goal.speed = 40.0
+        goal.step_size_cm = 2.0
         self.linear_client.send_goal_async(goal)
         time.sleep(2.0)  # Wait for movement
     
@@ -246,19 +259,23 @@ class BottleSeeker(Node):
         # Celebrate with head wiggle (optional)
         for _ in range(3):
             goal = HeadPosition.Goal()
-            goal.pan = 30.0
-            goal.tilt = 0.0
+            goal.pan_degrees = 30.0
+            goal.tilt_degrees = 0.0
+            goal.smooth = True
             self.head_client.send_goal_async(goal)
             time.sleep(0.5)
             
-            goal.pan = -30.0
+            goal.pan_degrees = -30.0
+            goal.tilt_degrees = 0.0
+            goal.smooth = True
             self.head_client.send_goal_async(goal)
             time.sleep(0.5)
         
         # Center head
         goal = HeadPosition.Goal()
-        goal.pan = 0.0
-        goal.tilt = 0.0
+        goal.pan_degrees = 0.0
+        goal.tilt_degrees = 0.0
+        goal.smooth = True
         self.head_client.send_goal_async(goal)
         
         # Stop the node
