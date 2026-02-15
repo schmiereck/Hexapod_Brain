@@ -24,6 +24,7 @@ setup(
     entry_points={
         'console_scripts': [
             'yolo_detector = hexapod_vision.yolo_detector:main',
+            'yolo_detector_tflite = hexapod_vision.yolo_detector_tflite:main',
         ],
     },
 )
