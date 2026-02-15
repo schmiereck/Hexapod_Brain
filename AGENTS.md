@@ -11,6 +11,11 @@ Before doing anything else:
 
 Don't ask permission. Just do it.
 
+## TODOs
+
+Use `memory/TODO.md` to track your tasks. Update it as you go. Check it at the start of each session.
+This file is used to track the project status and next steps.
+
 ## Memory
 
 You wake up fresh each session. These files are your continuity:
