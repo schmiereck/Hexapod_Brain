@@ -75,3 +75,43 @@ This way, the project file is always up to date and can be used as a reference f
 ## 🔗 Important References
 *   See `Docu/hexapod_vision_projekt.md` for detailed roadmap.
 *   See `BRAIN_README.md` (or `README.md`) for setup instructions.
+
+## YOLOv8 TFLite Detector - Working Configuration ✅
+
+### Final Implementation
+- **Model Format**: YOLOv8n TFLite (float16 quantized, 6.2 MB)
+- **Model Location**: `~/Hexapod_Brain/yolov8n_float32.tflite` (NOT in git - add manually)
+- **Input**: Compressed images from `/raspclaws/camera/image_raw/compressed` (10 FPS, 320x240)
+- **Output**: Detection2DArray with COCO class names and confidence scores (0-1 range)
+- **Performance**: ~0.6 FPS detection rate on Raspberry Pi 5
+- **Launch**: `ros2 launch hexapod_vision yolo_detector_tflite.launch.py`
+
+### Topics
+- **Subscribe**: `/raspclaws/camera/image_raw/compressed` (sensor_msgs/CompressedImage)
+- **Publish**: `/hexapod/detections` (vision_msgs/Detection2DArray)
+- **Publish**: `/hexapod/detections/image` (sensor_msgs/Image, annotated debug images)
+
+### Critical Implementation Details
+1. **YOLOv8 Output Format**: [1, 84, 8400] must be transposed to [8400, 84]
+2. **Class Scores**: Raw outputs are logits, need sigmoid activation: `1/(1+exp(-x))`
+3. **No Objectness**: YOLOv8 has no objectness score, only 80 class scores
+4. **Coordinates**: Already in pixel space (640x640), not normalized [0,1]
+5. **Preprocessing**: 320x240 → 640x640 with padding to maintain aspect ratio
+6. **ROS_DOMAIN_ID=1**: MUST be set to see topics from raspclaws-1
+
+### COCO Classes (80 total)
+Full list in `yolo_detector_tflite.py` COCO_CLASSES array. Examples:
+- **People/Animals**: person, bird, cat, dog, horse, sheep, cow, elephant, bear, zebra, giraffe
+- **Vehicles**: bicycle, car, motorcycle, airplane, bus, train, truck, boat
+- **Indoor**: chair, couch, bed, dining table, toilet, tv, laptop, mouse, keyboard, cell phone
+- **Objects**: bottle, cup, fork, knife, spoon, bowl, clock, vase, scissors, book
+
+### Detection Message Format
+```yaml
+class_id: "bottle"          # Human-readable COCO class name
+score: 0.5000592470169067   # Confidence score (0-1 range)
+bbox:                       # Bounding box in original image coordinates
+  center: {x: 160.5, y: 120.3}
+  size_x: 45.2
+  size_y: 67.8
+```
