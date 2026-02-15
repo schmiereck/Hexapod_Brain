@@ -12,7 +12,7 @@ def generate_launch_description():
                 'confidence_threshold': 0.5,
                 'iou_threshold': 0.45,
                 'image_topic': '/raspclaws/camera/image_raw',
-                'input_size': 640
+                'input_size': 640  # Must match TFLite model input size
             }],
             output='screen'
         )

@@ -1,6 +1,6 @@
 import rclpy
 from rclpy.node import Node
-from sensor_msgs.msg import Image
+from sensor_msgs.msg import Image, CompressedImage
 from vision_msgs.msg import Detection2DArray, Detection2D, ObjectHypothesisWithPose
 from cv_bridge import CvBridge
 import cv2
@@ -36,12 +36,14 @@ class YOLODetectorTFLite(Node):
         self.declare_parameter('confidence_threshold', 0.5)
         self.declare_parameter('iou_threshold', 0.45)
         self.declare_parameter('image_topic', '/raspclaws/camera/image_raw')
+        self.declare_parameter('use_compressed', True)
         self.declare_parameter('input_size', 640)
         
         model_path = self.get_parameter('model_path').value
         self.conf_threshold = self.get_parameter('confidence_threshold').value
         self.iou_threshold = self.get_parameter('iou_threshold').value
         image_topic = self.get_parameter('image_topic').value
+        use_compressed = self.get_parameter('use_compressed').value
         self.input_size = self.get_parameter('input_size').value
         
         self.get_logger().info(f"Loading TFLite YOLO model: {model_path}...")
@@ -63,8 +65,14 @@ class YOLODetectorTFLite(Node):
         self.bridge = CvBridge()
         
         # Subscriber & Publisher
-        self.image_sub = self.create_subscription(
-            Image, image_topic, self.image_callback, 10)
+        if use_compressed:
+            self.image_sub = self.create_subscription(
+                CompressedImage, image_topic + '/compressed', self.compressed_image_callback, 10)
+            self.get_logger().info(f"YOLO TFLite Detector Node started. Listening on {image_topic}/compressed")
+        else:
+            self.image_sub = self.create_subscription(
+                Image, image_topic, self.image_callback, 10)
+            self.get_logger().info(f"YOLO TFLite Detector Node started. Listening on {image_topic}")
         
         self.detection_pub = self.create_publisher(
             Detection2DArray, '/hexapod/detections', 10)
@@ -75,8 +83,6 @@ class YOLODetectorTFLite(Node):
         # Performance tracking
         self.frame_count = 0
         self.start_time = self.get_clock().now()
-        
-        self.get_logger().info(f'YOLO TFLite Detector Node started. Listening on {image_topic}')
     
     def preprocess_image(self, image):
         """Preprocess image for YOLO input."""
@@ -105,31 +111,44 @@ class YOLODetectorTFLite(Node):
         return input_data, scale, pad_x, pad_y
     
     def postprocess_detections(self, output, original_shape, scale, pad_x, pad_y):
-        """Convert model output to detections."""
+        """Convert YOLOv8 model output to detections.
+        
+        YOLOv8 TFLite format: [1, 84, 8400]
+        - 84 channels: [x_center, y_center, width, height, class_0_logit, ..., class_79_logit]
+        - 8400 predictions
+        - Coordinates are in model input space (640x640), NOT normalized [0,1]
+        - Class scores are logits and need sigmoid activation
+        """
         detections = []
         
-        # Output shape: [1, 25200, 85] or [1, 8400, 85] depending on model
-        # Format: [x, y, w, h, confidence, class_scores...]
-        predictions = output[0]
+        # Transpose from [1, 84, 8400] to [8400, 84]
+        predictions = output[0].T  # Now shape is [8400, 84]
         
+        max_conf_seen = 0.0  # Debug: track max confidence
         for pred in predictions:
-            # Extract box coordinates and confidence
+            # Extract box coordinates (first 4 values) - already in 640x640 pixel space
             x_center, y_center, width, height = pred[:4]
-            obj_conf = pred[4]
-            class_scores = pred[5:]
             
-            if obj_conf < self.conf_threshold:
-                continue
+            # YOLOv8 has NO objectness score, only class scores (as logits)
+            class_logits = pred[4:]  # 80 class logits
+            
+            # Apply sigmoid to convert logits to probabilities
+            class_scores = 1 / (1 + np.exp(-class_logits))
             
             # Get class with highest score
             class_id = np.argmax(class_scores)
             class_conf = class_scores[class_id]
-            final_conf = obj_conf * class_conf
             
-            if final_conf < self.conf_threshold:
+            # Track max confidence for debugging
+            if class_conf > max_conf_seen:
+                max_conf_seen = class_conf
+            
+            # Use class confidence as final confidence
+            if class_conf < self.conf_threshold:
                 continue
             
-            # Convert from normalized coordinates to pixel coordinates
+            # Convert from padded 640x640 space to original image space
+            # Remove padding offset first
             x_center = (x_center - pad_x) / scale
             y_center = (y_center - pad_y) / scale
             width = width / scale
@@ -143,10 +162,14 @@ class YOLODetectorTFLite(Node):
             
             detections.append({
                 'bbox': [x1, y1, x2, y2],
-                'confidence': final_conf,
+                'confidence': float(class_conf),
                 'class_id': int(class_id),
-                'class_name': self.COCO_CLASSES[class_id] if class_id < len(self.COCO_CLASSES) else str(class_id)
+                'class_name': self.COCO_CLASSES[class_id] if class_id < len(self.COCO_CLASSES) else f"class_{class_id}"
             })
+        
+        # Debug log
+        if len(detections) == 0:
+            self.get_logger().debug(f"No detections above threshold {self.conf_threshold}. Max confidence seen: {max_conf_seen:.4f}")
         
         # Apply NMS (Non-Maximum Suppression)
         detections = self.non_max_suppression(detections)
@@ -196,6 +219,82 @@ class YOLODetectorTFLite(Node):
         union = area1 + area2 - intersection
         
         return intersection / union if union > 0 else 0.0
+    
+    def compressed_image_callback(self, msg):
+        try:
+            # Decode compressed image
+            np_arr = np.frombuffer(msg.data, np.uint8)
+            cv_image = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+            if cv_image is None:
+                self.get_logger().error("Failed to decode compressed image")
+                return
+            original_shape = cv_image.shape[:2]
+        except Exception as e:
+            self.get_logger().error(f"Compressed image decode error: {e}")
+            return
+        
+        # Preprocess
+        input_data, scale, pad_x, pad_y = self.preprocess_image(cv_image)
+        
+        # Run inference
+        self.interpreter.set_tensor(self.input_details[0]['index'], input_data)
+        self.interpreter.invoke()
+        output = self.interpreter.get_tensor(self.output_details[0]['index'])
+        
+        # Postprocess
+        detections = self.postprocess_detections(output, original_shape, scale, pad_x, pad_y)
+        
+        # Create Detection2DArray
+        detection_array = Detection2DArray()
+        detection_array.header = msg.header
+        
+        for det in detections:
+            detection = Detection2D()
+            
+            # Bounding Box
+            x1, y1, x2, y2 = det['bbox']
+            w = x2 - x1
+            h = y2 - y1
+            cx = x1 + w / 2
+            cy = y1 + h / 2
+            
+            detection.bbox.center.position.x = float(cx)
+            detection.bbox.center.position.y = float(cy)
+            detection.bbox.size_x = float(w)
+            detection.bbox.size_y = float(h)
+            
+            # Class and Confidence
+            hypothesis = ObjectHypothesisWithPose()
+            hypothesis.hypothesis.class_id = det['class_name']
+            hypothesis.hypothesis.score = float(det['confidence'])
+            detection.results.append(hypothesis)
+            
+            detection_array.detections.append(detection)
+        
+        # Publish detections
+        self.detection_pub.publish(detection_array)
+        
+        # Publish annotated image (for debugging)
+        if self.annotated_pub.get_subscription_count() > 0:
+            annotated = cv_image.copy()
+            for det in detections:
+                x1, y1, x2, y2 = [int(v) for v in det['bbox']]
+                cv2.rectangle(annotated, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                label = f"{det['class_name']}: {det['confidence']:.2f}"
+                cv2.putText(annotated, label, (x1, y1-10), 
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+            
+            annotated_msg = self.bridge.cv2_to_imgmsg(annotated, "bgr8")
+            annotated_msg.header = msg.header
+            self.annotated_pub.publish(annotated_msg)
+        
+        # Log FPS occasionally
+        self.frame_count += 1
+        if self.frame_count % 30 == 0:
+            now = self.get_clock().now()
+            elapsed = (now - self.start_time).nanoseconds / 1e9
+            fps = self.frame_count / elapsed
+            self.get_logger().info(f'FPS: {fps:.2f}, Detections: {len(detections)}')
     
     def image_callback(self, msg):
         try:
