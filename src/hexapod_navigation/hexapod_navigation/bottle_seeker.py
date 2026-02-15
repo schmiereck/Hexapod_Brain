@@ -62,6 +62,7 @@ class BottleSeeker(Node):
         self.current_scan_index = 0
         self.last_detection_time = None
         self.start_time = time.time()
+        self.last_scan_time = 0.0  # Time when last scan position was set
         
         # Current bottle info
         self.bottle_bbox = None
@@ -162,6 +163,11 @@ class BottleSeeker(Node):
             self.transition_to(State.CENTERING)
             return
         
+        # Non-blocking scan: wait for delay before next position
+        current_time = time.time()
+        if current_time - self.last_scan_time < self.head_scan_delay:
+            return  # Still waiting for current position
+        
         # Continue head scanning
         if self.current_scan_index < len(self.head_scan_positions):
             pan_angle = self.head_scan_positions[self.current_scan_index]
@@ -175,8 +181,8 @@ class BottleSeeker(Node):
             
             self.head_client.send_goal_async(goal)
             
-            # Wait for next scan position
-            time.sleep(self.head_scan_delay)
+            # Record time and advance index
+            self.last_scan_time = current_time
             self.current_scan_index += 1
         else:
             # Completed full head scan, rotate robot and reset head
@@ -188,9 +194,8 @@ class BottleSeeker(Node):
             goal.tilt_degrees = self.head_tilt_angle
             goal.smooth = True
             self.head_client.send_goal_async(goal)
-            time.sleep(1.0)  # Wait for head to center
             
-            # Then rotate robot
+            # Then rotate robot (wait 1s handled by next scan delay)
             self.current_scan_index = 0
             goal = Rotate.Goal()
             goal.angle_degrees = 30.0
@@ -198,7 +203,9 @@ class BottleSeeker(Node):
             goal.step_size_deg = 5.0
             goal.use_imu = True
             self.rotate_client.send_goal_async(goal)
-            time.sleep(2.0)  # Wait for rotation
+            
+            # Reset scan timer for next cycle
+            self.last_scan_time = current_time
     
     def state_centering(self):
         """Center bottle in camera frame."""
@@ -220,7 +227,6 @@ class BottleSeeker(Node):
             goal.step_size_deg = 5.0
             goal.use_imu = True
             self.rotate_client.send_goal_async(goal)
-            time.sleep(1.5)
         elif bottle_x > right_threshold:
             # Bottle is right, rotate right
             self.get_logger().info(f'Bottle at x={bottle_x:.0f} (RIGHT). Rotating {self.rotation_step}°')
@@ -230,7 +236,6 @@ class BottleSeeker(Node):
             goal.step_size_deg = 5.0
             goal.use_imu = True
             self.rotate_client.send_goal_async(goal)
-            time.sleep(1.5)
         else:
             # Bottle is centered
             self.get_logger().info(f'Bottle CENTERED at x={bottle_x:.0f}')
@@ -270,7 +275,6 @@ class BottleSeeker(Node):
         goal.speed = 40.0
         goal.step_size_cm = 2.0
         self.linear_client.send_goal_async(goal)
-        time.sleep(2.0)  # Wait for movement
     
     def state_arrived(self):
         """Mission complete."""

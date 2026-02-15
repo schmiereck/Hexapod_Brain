@@ -5,9 +5,9 @@ bottle_seeker:
     min_confidence: 0.5
     
     # Camera/Head
-    head_scan_positions: [-45.0, 0.0, 45.0]  # pan degrees (3 positions for faster scan)
+    head_scan_positions: [-30.0, 0.0, 30.0]  # pan degrees (3 narrow positions)
     head_tilt_angle: -60.0  # tilt degrees (negative = look down/forward, -67.0 is max down)
-    head_scan_delay: 3.5  # seconds per position (increased for slow YOLO detector ~0.6 FPS)
+    head_scan_delay: 5.0  # seconds per position (long delay for 0.6 FPS YOLO detector)
     
     # Centering
     image_width: 640  # from YOLO input size
