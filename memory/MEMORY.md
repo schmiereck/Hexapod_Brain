@@ -1,6 +1,6 @@
 # MEMORY.md - Hexapod Brain Project
 
-## Projekt Taget
+## Projekt Target
 The Taget of the Project is defined in "docu/hexapod_vision_projekt.md".
 Edit this file, if the targets are changing.
 
