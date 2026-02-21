@@ -167,8 +167,12 @@ class BottleSeeker(Node):
             self.transition_to(State.CENTERING)
             return
         
-        # Non-blocking scan: wait for delay before next position
+        # Don't send new commands if action in progress or waiting for stabilization
         current_time = time.time()
+        if self.action_in_progress or (current_time - self.last_action_time) < self.stabilization_delay:
+            return
+        
+        # Non-blocking scan: wait for delay before next position
         if current_time - self.last_scan_time < self.head_scan_delay:
             return  # Still waiting for current position
         
@@ -199,14 +203,16 @@ class BottleSeeker(Node):
             goal.smooth = True
             self.head_client.send_goal_async(goal)
             
-            # Then rotate robot (wait 1s handled by next scan delay)
+            # Then rotate robot (with action tracking to prevent spam)
             self.current_scan_index = 0
             goal = Rotate.Goal()
             goal.angle_degrees = 30.0
             goal.speed = 40.0
             goal.step_size_deg = 5.0
             goal.use_imu = True
-            self.rotate_client.send_goal_async(goal)
+            self.action_in_progress = True
+            future = self.rotate_client.send_goal_async(goal)
+            future.add_done_callback(self._on_action_complete)
             
             # Reset scan timer for next cycle
             self.last_scan_time = current_time
