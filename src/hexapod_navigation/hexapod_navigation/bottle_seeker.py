@@ -194,28 +194,19 @@ class BottleSeeker(Node):
             self.current_scan_index += 1
         else:
             # Completed full head scan, rotate robot and reset head
-            self.get_logger().info('Full head scan complete. Centering head and rotating robot 30°...')
+            self.get_logger().info('Full head scan complete. Rotating robot 30°...')
             
-            # First, center the head
-            goal = HeadPosition.Goal()
-            goal.pan_degrees = 0.0
-            goal.tilt_degrees = self.head_tilt_angle
-            goal.smooth = True
-            self.head_client.send_goal_async(goal)
-            
-            # Then rotate robot (with action tracking to prevent spam)
-            self.current_scan_index = 0
+            # Rotate robot (with action tracking to prevent spam)
             goal = Rotate.Goal()
             goal.angle_degrees = 30.0
-            goal.speed = 40.0
-            goal.step_size_deg = 5.0
+            goal.speed = 30.0  # Reduced from 40 for smoother motion
+            goal.step_size_deg = 3.0  # Reduced from 5 for finer control
             goal.use_imu = True
             self.action_in_progress = True
             future = self.rotate_client.send_goal_async(goal)
-            future.add_done_callback(self._on_action_complete)
+            future.add_done_callback(self._on_search_rotate_complete)
             
-            # Reset scan timer for next cycle
-            self.last_scan_time = current_time
+            # Don't reset scan_index or scan_time yet - wait for rotation to complete
     
     def state_centering(self):
         """Center bottle in camera frame."""
@@ -309,6 +300,14 @@ class BottleSeeker(Node):
         self.action_in_progress = False
         self.last_action_time = time.time()
         self.get_logger().info(f'Action complete, stabilizing for {self.stabilization_delay}s')
+    
+    def _on_search_rotate_complete(self, future):
+        """Callback when search rotation completes - resets scan cycle."""
+        self.action_in_progress = False
+        self.last_action_time = time.time()
+        self.current_scan_index = 0  # Reset scan to start new cycle
+        self.last_scan_time = time.time()  # Reset scan timer
+        self.get_logger().info(f'Search rotation complete. Starting new head scan cycle.')
     
     def state_arrived(self):
         """Mission complete."""
