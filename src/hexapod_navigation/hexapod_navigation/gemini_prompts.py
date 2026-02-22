@@ -139,11 +139,11 @@ You MUST respond with EXACTLY this JSON structure:
   "action": {
     "type": "rotate",
     "parameters": {
-      "angle_degrees": -20.0,
+      "angle_degrees": 20.0,
       "speed": 40.0
     }
   },
-  "explanation": "Rotate left (negative angle) to center bottle in view before approaching"
+  "explanation": "Rotate right (positive angle) to center bottle in view before approaching"
 }
 ```
 
@@ -165,11 +165,11 @@ You MUST respond with EXACTLY this JSON structure:
   "action": {
     "type": "rotate",
     "parameters": {
-      "angle_degrees": 20.0,
+      "angle_degrees": -20.0,
       "speed": 40.0
     }
   },
-  "explanation": "Rotate right (positive angle) to center bottle in view before approaching"
+  "explanation": "Rotate left (negative angle) to center bottle in view before approaching"
 }
 ```
 
@@ -278,8 +278,8 @@ You MUST respond with EXACTLY this JSON structure:
 - **ALWAYS include parameters** for linear_move, rotate, and head_position actions
 - **Rotation angles**: NEGATIVE = turn left, POSITIVE = turn right
 - **Centering logic**: 
-  - Object on LEFT (x < 320) → Rotate RIGHT (positive angle) to center it
-  - Object on RIGHT (x > 320) → Rotate LEFT (negative angle) to center it
+  - Object on LEFT (x < 320) → Rotate LEFT (NEGATIVE angle) to swing camera left and center it
+  - Object on RIGHT (x > 320) → Rotate RIGHT (POSITIVE angle) to swing camera right and center it
 - **Never leave parameters empty** unless action type is "wait"
 
 ## Important Reminders
@@ -288,8 +288,8 @@ You MUST respond with EXACTLY this JSON structure:
 - **Image coordinates**: (0,0) is top-left, (width, height) is bottom-right
 - **Image center for 640x480**: x=320, y=240
 - **Rotation angles**: NEGATIVE = turn robot body left, POSITIVE = turn robot body right
-  - Object on LEFT → use POSITIVE angle to rotate right and center it
-  - Object on RIGHT → use NEGATIVE angle to rotate left and center it
+  - Object on LEFT (x < 320) → Use NEGATIVE angle to turn body left, swinging camera left to center object
+  - Object on RIGHT (x > 320) → Use POSITIVE angle to turn body right, swinging camera right to center object
 - **Lower Y values in bbox** mean closer to ground = potential obstacle
 - **You are slow**: Each action takes 3-5 seconds, so be patient and deliberate
 - **When in doubt, scan first**: Use head_position or rotate to gather more information
