@@ -93,22 +93,25 @@ You MUST respond with EXACTLY this JSON structure:
   "action": {
     "type": "linear_move | rotate | head_position | wait",
     "parameters": {
-      // For linear_move:
-      "distance_cm": 10.0,
-      "speed": 40
-      // For rotate:
-      "angle_degrees": 30.0,
-      "speed": 40
-      // For head_position:
-      "pan_degrees": 0.0,
-      "tilt_degrees": -75.0
-      // For wait:
+      // IMPORTANT: Always include ALL required parameters for the chosen action type!
+      // For linear_move (REQUIRED):
+      "distance_cm": 10.0,  // float, -100 to 100
+      "speed": 40.0         // float, 0 to 100
+      // For rotate (REQUIRED):
+      "angle_degrees": 30.0, // float, -180 to 180 (NEGATIVE=left, POSITIVE=right)
+      "speed": 40.0          // float, 0 to 100
+      // For head_position (REQUIRED):
+      "pan_degrees": 0.0,    // float, -90 to 90
+      "tilt_degrees": -75.0  // float, -90 to 90
+      // For wait (empty is OK):
       // (no parameters)
     }
   },
   "explanation": "Brief reason for this action choice (one sentence)"
 }
 ```
+
+**CRITICAL**: The `parameters` field must ALWAYS contain the required parameters for your chosen action type. Never leave parameters empty unless action type is "wait"!
 
 ## Decision-Making Process (SayCan)
 1. **Say**: What does the goal require? (e.g., "approach bottle")
@@ -118,7 +121,7 @@ You MUST respond with EXACTLY this JSON structure:
 
 ## Examples
 
-### Example 1: Object Found but Off-Center
+### Example 1: Object Found but Off-Center (RIGHT SIDE)
 **Input**: 
 - Goal: "Find and approach the bottle"
 - Detections: [{"class_id": "bottle", "bbox": {"center": {"x": 520, "y": 240}}}]
@@ -128,7 +131,33 @@ You MUST respond with EXACTLY this JSON structure:
 ```json
 {
   "reasoning": {
-    "observation": "Bottle detected at x=520 (right side of 640px image). It's off-center.",
+    "observation": "Bottle detected at x=520 (right side of 640px image). It's off-center to the right.",
+    "goal_status": "in progress - bottle found but not centered for approach",
+    "affordance_check": "Rotation is always safe. Will center bottle before approaching.",
+    "safety_rating": "high"
+  },
+  "action": {
+    "type": "rotate",
+    "parameters": {
+      "angle_degrees": -20.0,
+      "speed": 40.0
+    }
+  },
+  "explanation": "Rotate left (negative angle) to center bottle in view before approaching"
+}
+```
+
+### Example 1b: Object Found but Off-Center (LEFT SIDE)
+**Input**: 
+- Goal: "Find and approach the bottle"
+- Detections: [{"class_id": "bottle", "bbox": {"center": {"x": 120, "y": 240}}}]
+- Image: 640x480
+
+**Output**:
+```json
+{
+  "reasoning": {
+    "observation": "Bottle detected at x=120 (left side of 640px image, center is 320). It's off-center to the left.",
     "goal_status": "in progress - bottle found but not centered for approach",
     "affordance_check": "Rotation is always safe. Will center bottle before approaching.",
     "safety_rating": "high"
@@ -137,10 +166,10 @@ You MUST respond with EXACTLY this JSON structure:
     "type": "rotate",
     "parameters": {
       "angle_degrees": 20.0,
-      "speed": 40
+      "speed": 40.0
     }
   },
-  "explanation": "Rotate right to center bottle in view before approaching"
+  "explanation": "Rotate right (positive angle) to center bottle in view before approaching"
 }
 ```
 
@@ -163,7 +192,7 @@ You MUST respond with EXACTLY this JSON structure:
     "type": "linear_move",
     "parameters": {
       "distance_cm": 15.0,
-      "speed": 40
+      "speed": 40.0
     }
   },
   "explanation": "Move forward to approach bottle (path is clear)"
@@ -212,7 +241,7 @@ You MUST respond with EXACTLY this JSON structure:
     "type": "rotate",
     "parameters": {
       "angle_degrees": 45.0,
-      "speed": 40
+      "speed": 40.0
     }
   },
   "explanation": "Rotate to scan environment and find bottle"
@@ -238,20 +267,33 @@ You MUST respond with EXACTLY this JSON structure:
     "type": "rotate",
     "parameters": {
       "angle_degrees": 60.0,
-      "speed": 40
+      "speed": 40.0
     }
   },
   "explanation": "Obstacle in path - rotating to find clear route"
 }
 ```
 
+## Important Reminders About Parameters
+- **ALWAYS include parameters** for linear_move, rotate, and head_position actions
+- **Rotation angles**: NEGATIVE = turn left, POSITIVE = turn right
+- **Centering logic**: 
+  - Object on LEFT (x < 320) → Rotate RIGHT (positive angle) to center it
+  - Object on RIGHT (x > 320) → Rotate LEFT (negative angle) to center it
+- **Never leave parameters empty** unless action type is "wait"
+
 ## Important Reminders
 - **Always check safety_rating** - if "low", prefer scanning or rotation over movement
 - **Bbox size indicates distance**: Small bbox = far away, Large bbox = close
 - **Image coordinates**: (0,0) is top-left, (width, height) is bottom-right
+- **Image center for 640x480**: x=320, y=240
+- **Rotation angles**: NEGATIVE = turn robot body left, POSITIVE = turn robot body right
+  - Object on LEFT → use POSITIVE angle to rotate right and center it
+  - Object on RIGHT → use NEGATIVE angle to rotate left and center it
 - **Lower Y values in bbox** mean closer to ground = potential obstacle
 - **You are slow**: Each action takes 3-5 seconds, so be patient and deliberate
 - **When in doubt, scan first**: Use head_position or rotate to gather more information
+- **ALWAYS include action parameters**: Never send empty parameters unless action is "wait"
 
 ## Final Note
 You control a real physical robot. Your decisions have consequences. Always prioritize safety and feasibility over speed.
@@ -275,7 +317,40 @@ RESPONSE_SCHEMA = {
             "type": "object",
             "properties": {
                 "type": {"type": "string", "enum": ["linear_move", "rotate", "head_position", "wait"]},
-                "parameters": {"type": "object"}
+                "parameters": {
+                    "type": "object",
+                    "oneOf": [
+                        {
+                            "description": "Parameters for linear_move action",
+                            "properties": {
+                                "distance_cm": {"type": "number", "minimum": -100, "maximum": 100},
+                                "speed": {"type": "number", "minimum": 0, "maximum": 100}
+                            },
+                            "required": ["distance_cm", "speed"]
+                        },
+                        {
+                            "description": "Parameters for rotate action",
+                            "properties": {
+                                "angle_degrees": {"type": "number", "minimum": -180, "maximum": 180},
+                                "speed": {"type": "number", "minimum": 0, "maximum": 100}
+                            },
+                            "required": ["angle_degrees", "speed"]
+                        },
+                        {
+                            "description": "Parameters for head_position action",
+                            "properties": {
+                                "pan_degrees": {"type": "number", "minimum": -90, "maximum": 90},
+                                "tilt_degrees": {"type": "number", "minimum": -90, "maximum": 90}
+                            },
+                            "required": ["pan_degrees", "tilt_degrees"]
+                        },
+                        {
+                            "description": "Parameters for wait action (empty)",
+                            "properties": {},
+                            "additionalProperties": False
+                        }
+                    ]
+                }
             },
             "required": ["type", "parameters"]
         },
