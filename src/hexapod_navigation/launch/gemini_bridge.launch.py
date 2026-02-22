@@ -22,7 +22,7 @@ def generate_launch_description():
     
     model_name_arg = DeclareLaunchArgument(
         'model_name',
-        default_value='gemini-2.5-flash',
+        default_value='models/gemini-robotics-er-1.5-preview',
         description='Gemini model (2.5-flash is better for structured output than robotics-er-1.5-preview)'
     )
     
