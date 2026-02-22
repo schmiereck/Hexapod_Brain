@@ -20,7 +20,7 @@ from typing import Optional, Dict, Any
 from sensor_msgs.msg import CompressedImage
 from vision_msgs.msg import Detection2DArray
 from std_msgs.msg import String
-from raspclaws_interfaces.action import HeadPosition, Rotate, LinearMove
+from raspclaws_interfaces.action import HeadPosition, Rotate, LinearMove, ArcMove
 
 # Gemini API
 from google import genai
@@ -122,12 +122,14 @@ class GeminiBridge(Node):
         self.head_client = ActionClient(self, HeadPosition, '/raspclaws/head_position')
         self.rotate_client = ActionClient(self, Rotate, '/raspclaws/rotate')
         self.linear_client = ActionClient(self, LinearMove, '/raspclaws/linear_move')
+        self.arc_client = ActionClient(self, ArcMove, '/raspclaws/arc_move')
         
         # Wait for action servers
         self.get_logger().info('Waiting for action servers...')
         self.head_client.wait_for_server(timeout_sec=10.0)
         self.rotate_client.wait_for_server(timeout_sec=10.0)
         self.linear_client.wait_for_server(timeout_sec=10.0)
+        self.arc_client.wait_for_server(timeout_sec=10.0)
         self.get_logger().info('All action servers ready!')
         
         # Control loop
@@ -319,6 +321,16 @@ Based on this input, what action should I take next?
             self.action_in_progress = True
             future = self.head_client.send_goal_async(goal)
             future.add_done_callback(lambda f: self._on_goal_accepted(f, self._on_action_complete))
+            
+        elif action_type == 'arc_move':
+            goal = ArcMove.Goal()
+            goal.radius_cm = float(params.get('radius_cm', 50.0))
+            goal.angle_degrees = float(params.get('angle_degrees', 45.0))
+            goal.speed = float(params.get('speed', 40.0))
+            self.action_in_progress = True
+            future = self.arc_client.send_goal_async(goal)
+            future.add_done_callback(lambda f: self._on_goal_accepted(f, self._on_action_complete))
+            
         else:
             self.get_logger().error(f'Unknown action type: {action_type}')
             self.transition_to(State.IDLE)

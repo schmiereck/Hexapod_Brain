@@ -55,7 +55,16 @@ You can execute these ROS2 Actions:
    - Affordance: Always possible (rotates in place)
    - When to use: Centering objects in view, scanning environment, changing orientation
 
-3. **head_position**
+3. **arc_move**
+   - Description: Move in a curved trajectory (combines forward motion with rotation)
+   - Parameters:
+     - radius_cm: float (-200 to 200, positive=right arc, negative=left arc)
+     - angle_degrees: float (-180 to 180, angle to travel along arc)
+     - speed: int (0-100, typical: 40)
+   - Affordance: Requires clear path in arc direction
+   - When to use: Circling around objects, avoiding obstacles while maintaining view, smooth approach
+
+4. **head_position**
    - Description: Move camera to look in a direction
    - Parameters:
      - pan_degrees: float (-90 to 90, 0=center)
@@ -63,7 +72,7 @@ You can execute these ROS2 Actions:
    - Affordance: Always possible
    - When to use: Scanning without moving body, tracking objects, looking at ground
 
-4. **wait**
+5. **wait**
    - Description: Do nothing (wait for environment to change)
    - Parameters: None
    - Affordance: Always possible
@@ -91,7 +100,7 @@ You MUST respond with EXACTLY this JSON structure:
     "safety_rating": "high | medium | low"
   },
   "action": {
-    "type": "linear_move | rotate | head_position | wait",
+    "type": "linear_move | rotate | arc_move | head_position | wait",
     "parameters": {
       // IMPORTANT: Always include ALL required parameters for the chosen action type!
       // For linear_move (REQUIRED):
@@ -99,6 +108,10 @@ You MUST respond with EXACTLY this JSON structure:
       "speed": 40.0         // float, 0 to 100
       // For rotate (REQUIRED):
       "angle_degrees": 30.0, // float, -180 to 180 (NEGATIVE=left, POSITIVE=right)
+      "speed": 40.0          // float, 0 to 100
+      // For arc_move (REQUIRED):
+      "radius_cm": 50.0,     // float, -200 to 200 (POSITIVE=right arc, NEGATIVE=left arc)
+      "angle_degrees": 45.0, // float, -180 to 180 (angle to travel)
       "speed": 40.0          // float, 0 to 100
       // For head_position (REQUIRED):
       "pan_degrees": 0.0,    // float, -90 to 90
@@ -317,17 +330,18 @@ RESPONSE_SCHEMA = {
         "action": {
             "type": "object",
             "properties": {
-                "type": {"type": "string", "enum": ["linear_move", "rotate", "head_position", "wait"]},
+                "type": {"type": "string", "enum": ["linear_move", "rotate", "arc_move", "head_position", "wait"]},
                 "parameters": {
                     "type": "object",
                     "properties": {
                         "distance_cm": {"type": "number", "description": "Distance in cm for linear_move (10-50)"},
-                        "angle_degrees": {"type": "number", "description": "Angle in degrees for rotate (-90 to 90). NEGATIVE=left, POSITIVE=right"},
-                        "speed": {"type": "number", "description": "Speed 0-100 for linear_move and rotate (typically 30-50)"},
+                        "angle_degrees": {"type": "number", "description": "Angle in degrees for rotate or arc_move (-180 to 180). NEGATIVE=left, POSITIVE=right"},
+                        "radius_cm": {"type": "number", "description": "Radius in cm for arc_move (-200 to 200). POSITIVE=right arc, NEGATIVE=left arc"},
+                        "speed": {"type": "number", "description": "Speed 0-100 for linear_move, rotate, and arc_move (typically 30-50)"},
                         "pan_degrees": {"type": "number", "description": "Pan angle for head_position (-90 to 90)"},
                         "tilt_degrees": {"type": "number", "description": "Tilt angle for head_position (-45 to 45)"}
                     },
-                    "description": "Include only the parameters needed for your chosen action type. For rotate: angle_degrees, speed. For linear_move: distance_cm, speed. For head_position: pan_degrees, tilt_degrees. For wait: empty object."
+                    "description": "Include only the parameters needed for your chosen action type. For rotate: angle_degrees, speed. For linear_move: distance_cm, speed. For arc_move: radius_cm, angle_degrees, speed. For head_position: pan_degrees, tilt_degrees. For wait: empty object."
                 }
             },
             "required": ["type", "parameters"]
