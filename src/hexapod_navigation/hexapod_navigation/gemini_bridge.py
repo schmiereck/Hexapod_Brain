@@ -268,7 +268,7 @@ Based on this input, what action should I take next?
         # Extract action
         action_data = self.last_gemini_response['action']
         action_type = action_data['type']
-        params = action_data['parameters']
+        params = action_data.get('parameters', {})  # Use .get() with default
         safety_rating = self.last_gemini_response['reasoning']['safety_rating']
         
         # Safety check
@@ -276,8 +276,8 @@ Based on this input, what action should I take next?
             self.get_logger().warn('⚠️ Low safety rating, but executing action (override if needed)')
             # TODO: Add user confirmation or safety validation
         
-        # Execute action
-        self.get_logger().info(f'🚀 Executing: {action_type} with {params}')
+        # Log action with parameters
+        self.get_logger().info(f'🚀 Executing: {action_type} with params={params}')
         
         if action_type == 'wait':
             # No action needed
@@ -287,7 +287,7 @@ Based on this input, what action should I take next?
         elif action_type == 'linear_move':
             goal = LinearMove.Goal()
             goal.distance_cm = float(params.get('distance_cm', 10.0))
-            goal.speed = int(params.get('speed', 40))
+            goal.speed = float(params.get('speed', 40.0))
             goal.step_size_cm = 2.0
             self.action_in_progress = True
             future = self.linear_client.send_goal_async(goal)
@@ -296,7 +296,7 @@ Based on this input, what action should I take next?
         elif action_type == 'rotate':
             goal = Rotate.Goal()
             goal.angle_degrees = float(params.get('angle_degrees', 30.0))
-            goal.speed = int(params.get('speed', 40))
+            goal.speed = float(params.get('speed', 40.0))
             goal.step_size_deg = 5.0
             goal.use_imu = True
             self.action_in_progress = True
