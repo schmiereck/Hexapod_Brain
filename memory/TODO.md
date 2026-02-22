@@ -12,21 +12,22 @@
 *   [x] **YOLOv8n TFLite model downloaded and uploaded to ubuntu1**
 *   [x] **TFLite detector successfully starts and loads model**
 
-## 📝 Current TODOs (Phase 1 - Testing & Validation)
-1.  **Test with Live Camera Stream**:
-    - Ensure raspclaws-1 gui_server is publishing camera frames
-    - Run detector and verify detections: `ros2 topic echo /hexapod/detections`
-    - Check FPS and latency
+## ✅ Completed (Phase 2 - Navigation)
+*   [x] Created hexapod_navigation package
+*   [x] Implemented bottle_seeker.py node with state machine (SEARCHING, CENTERING, APPROACHING, ARRIVED)
+*   [x] Subscribed to `/hexapod/detections` for object detection
+*   [x] Implemented ROS2 Action clients for movement (linear_move, rotate, head_position)
+*   [x] Fixed "zappeln" bug with two-stage callback pattern (goal acceptance + result)
+*   [x] Added stabilization delays and action_in_progress flags
+*   [x] Tested successfully with live robot - autonomous bottle finding and approach ✅
+*   [x] Created setup_env.bash for easy workspace setup
 
-2.  **Optimize if Needed**:
-    - If FPS is low (<5), consider lowering input_size parameter
-    - Test with compressed image stream instead of raw
+**Lessons Learned**:
+- ROS2 Actions need two-stage callbacks (acceptance ≠ completion)
+- State machines need careful action tracking to prevent command spam
+- Stabilization delays critical for smooth movement (0.25s between actions)
 
-3.  **Documentation Update**:
-    - Document successful TFLite setup in README
-    - Add model download instructions
-
-## 📋 Next Phase (Phase 2 - Navigation)
+## 📋 Current Phase (Phase 3 - Gemini Robotics ER)
 1.  **Create hexapod_navigation Package**:
     - Navigation node that subscribes to `/hexapod/detections`
     - Implements behavior logic (e.g., "approach detected person")
@@ -40,11 +41,32 @@
 3.  **Integration Testing**:
     - End-to-end test: Camera → Detection → Navigation → Movement
 
-## 📋 Next Phase (Phase 3 - Gemini Robotics ER)
+### Goal
+Replace fixed state machine logic (bottle_seeker.py) with **LLM-based reasoning** using Google Gemini 2.0 Flash. The robot will use multimodal AI to decide actions based on:
+- Visual input (camera images)
+- Object detections (YOLO)
+- Available skills (ROS2 Actions)
+- User-defined goals
 
-Das ist ein anspruchsvolles und hochmodernes Architektur-Konzept. Wir bauen eine **"Hybrid-Intelligence-Bridge"**. Das Ziel ist es, die strategische Tiefe von Gemini ER (High-Level) mit der physikalischen Direktheit von ROS 2 (Low-Level) zu verknüpfen.
+### Architecture: Embodied Bridge
+New node `gemini_bridge.py` that implements:
+1. **SayCan Principle**: "Say" (goal) + "Can" (skills) → LLM decides action
+2. **Multimodal Input**: Image + Detection JSON + Skill Registry
+3. **Structured Output**: JSON schema with reasoning + action + parameters
+4. **Safety Validation**: Local checks before action execution
 
-Hier ist das Implementierungs-Konzept:
+### Implementation Tasks (Phase 3)
+
+**Status**: 🚀 In Progress
+
+#### Core Components:
+1. ✅ **Skill Registry**: Define all ROS2 Actions with descriptions for LLM
+2. ✅ **Perception Aggregator**: Subscribe to detections + images, convert to Gemini format
+3. ✅ **Gemini API Client**: Multimodal input, JSON schema enforcement
+4. ✅ **Action Dispatcher**: Parse JSON, execute actions with safety checks
+5. ✅ **State Machine**: IDLE → SENSING → REASONING → ACTING → EVALUATING
+
+**Detailed implementation concept**:
 
 ---
 
