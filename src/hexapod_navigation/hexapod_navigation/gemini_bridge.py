@@ -229,12 +229,16 @@ Based on this input, what action should I take next?
                 response_json = json.loads(response.text)
                 self.last_gemini_response = response_json
                 
+                # LOG COMPLETE JSON FOR DEBUGGING
+                self.get_logger().info('📋 COMPLETE Gemini response JSON:')
+                self.get_logger().info(json.dumps(response_json, indent=2))
+                
                 # Publish reasoning
                 reasoning_msg = String()
                 reasoning_msg.data = json.dumps(response_json, indent=2)
                 self.reasoning_pub.publish(reasoning_msg)
                 
-                # Log reasoning
+                # Log reasoning (summary)
                 self.get_logger().info(f'💡 Gemini reasoning:')
                 self.get_logger().info(f"   Observation: {response_json['reasoning']['observation']}")
                 self.get_logger().info(f"   Goal status: {response_json['reasoning']['goal_status']}")
