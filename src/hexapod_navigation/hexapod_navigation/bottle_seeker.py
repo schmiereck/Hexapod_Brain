@@ -204,7 +204,7 @@ class BottleSeeker(Node):
             goal.use_imu = True
             self.action_in_progress = True
             future = self.rotate_client.send_goal_async(goal)
-            future.add_done_callback(self._on_search_rotate_complete)
+            future.add_done_callback(lambda f: self._on_goal_accepted(f, self._on_search_rotate_complete))
             
             # Don't reset scan_index or scan_time yet - wait for rotation to complete
     
@@ -236,7 +236,7 @@ class BottleSeeker(Node):
             goal.use_imu = True
             self.action_in_progress = True
             future = self.rotate_client.send_goal_async(goal)
-            future.add_done_callback(self._on_action_complete)
+            future.add_done_callback(lambda f: self._on_goal_accepted(f, self._on_action_complete))
         elif bottle_x > right_threshold:
             # Bottle is right, rotate right (POSITIVE angle)
             self.get_logger().info(f'Bottle RIGHT of center. Rotating RIGHT ({self.rotation_step}°)')
@@ -247,7 +247,7 @@ class BottleSeeker(Node):
             goal.use_imu = True
             self.action_in_progress = True
             future = self.rotate_client.send_goal_async(goal)
-            future.add_done_callback(self._on_action_complete)
+            future.add_done_callback(lambda f: self._on_goal_accepted(f, self._on_action_complete))
         else:
             # Bottle is centered
             self.get_logger().info(f'Bottle CENTERED at x={bottle_x:.0f}')
@@ -293,21 +293,35 @@ class BottleSeeker(Node):
         goal.step_size_cm = 2.0
         self.action_in_progress = True
         future = self.linear_client.send_goal_async(goal)
-        future.add_done_callback(self._on_action_complete)
+        future.add_done_callback(lambda f: self._on_goal_accepted(f, self._on_action_complete))
+    
+    def _on_goal_accepted(self, future, completion_callback):
+        """Callback when goal is accepted - now wait for result."""
+        goal_handle = future.result()
+        if not goal_handle.accepted:
+            self.get_logger().error('Goal rejected!')
+            self.action_in_progress = False
+            return
+        
+        self.get_logger().debug('Goal accepted, waiting for result...')
+        result_future = goal_handle.get_result_async()
+        result_future.add_done_callback(completion_callback)
     
     def _on_action_complete(self, future):
-        """Callback when action completes, starts stabilization delay."""
+        """Callback when action result received, starts stabilization delay."""
+        result = future.result()
         self.action_in_progress = False
         self.last_action_time = time.time()
-        self.get_logger().info(f'Action complete, stabilizing for {self.stabilization_delay}s')
+        self.get_logger().info(f'Action complete (success={result.status == 4}), stabilizing for {self.stabilization_delay}s')
     
     def _on_search_rotate_complete(self, future):
-        """Callback when search rotation completes - resets scan cycle."""
+        """Callback when search rotation result received - resets scan cycle."""
+        result = future.result()
         self.action_in_progress = False
         self.last_action_time = time.time()
         self.current_scan_index = 0  # Reset scan to start new cycle
         self.last_scan_time = time.time()  # Reset scan timer
-        self.get_logger().info(f'Search rotation complete. Starting new head scan cycle.')
+        self.get_logger().info(f'Search rotation complete (success={result.status == 4}). Starting new head scan cycle.')
     
     def state_arrived(self):
         """Mission complete."""
