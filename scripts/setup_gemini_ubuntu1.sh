@@ -14,15 +14,15 @@ echo "1. Checking Python version..."
 PYTHON_VERSION=$(python3 --version)
 echo "   $PYTHON_VERSION"
 
-# Install google-generativeai
+# Install google-genai (NEW official SDK)
 echo ""
-echo "2. Installing google-generativeai..."
-pip3 install google-generativeai pillow
+echo "2. Installing google-genai..."
+pip3 install google-genai pillow
 
 # Verify installation
 echo ""
 echo "3. Verifying installation..."
-python3 -c "import google.generativeai as genai; print('   ✅ google-generativeai imported successfully')"
+python3 -c "from google import genai; print('   ✅ google.genai imported successfully')"
 python3 -c "import PIL; print('   ✅ Pillow imported successfully')"
 
 # Check for API key
@@ -46,5 +46,8 @@ echo "=========================================="
 echo ""
 echo "Next steps:"
 echo "1. Set GEMINI_API_KEY in ~/.bashrc (if not done)"
-echo "2. Run test: python3 ~/Hexapod_Brain/scripts/test_gemini_api.py"
+echo "2. Run test: python3 ~/Hexapod_Brain/scripts/test_gemini_api_new.py"
 echo "3. If tests pass, proceed with gemini_bridge.py implementation"
+echo ""
+echo "NOTE: google-generativeai (old SDK) is DEPRECATED as of 2025."
+echo "      This script now installs google-genai (new official SDK)."

@@ -23,7 +23,7 @@ from std_msgs.msg import String
 from raspclaws_interfaces.action import HeadPosition, Rotate, LinearMove
 
 # Gemini API
-import google.generativeai as genai
+from google import genai
 from PIL import Image as PILImage
 
 # Local imports
@@ -69,16 +69,14 @@ class GeminiBridge(Node):
         self.retry_delay = self.get_parameter('retry_delay').value
         
         # Configure Gemini API
-        genai.configure(api_key=api_key)
-        self.model = genai.GenerativeModel(
-            self.model_name,
-            generation_config={
-                "response_mime_type": "application/json",
-                "response_schema": RESPONSE_SCHEMA
-            },
-            system_instruction=SYSTEM_INSTRUCTION
-        )
-        self.get_logger().info(f'Gemini model configured: {self.model_name}')
+        self.client = genai.Client(api_key=api_key)
+        self.model_name_full = self.model_name
+        self.generation_config = {
+            "response_mime_type": "application/json",
+            "response_schema": RESPONSE_SCHEMA,
+            "system_instruction": SYSTEM_INSTRUCTION
+        }
+        self.get_logger().info(f'Gemini client configured: {self.model_name}')
         
         # State
         self.state = State.IDLE
@@ -223,7 +221,13 @@ Based on this input, what action should I take next?
         for attempt in range(self.max_retries):
             try:
                 self.get_logger().info(f'🤖 Calling Gemini API (attempt {attempt + 1}/{self.max_retries})...')
-                response = self.model.generate_content([prompt, image_pil])
+                
+                # New API: client.models.generate_content
+                response = self.client.models.generate_content(
+                    model=self.model_name_full,
+                    contents=[prompt, image_pil],
+                    config=self.generation_config
+                )
                 
                 # Parse JSON response
                 response_json = json.loads(response.text)
