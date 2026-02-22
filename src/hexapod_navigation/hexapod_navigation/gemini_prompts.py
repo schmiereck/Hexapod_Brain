@@ -320,7 +320,14 @@ RESPONSE_SCHEMA = {
                 "type": {"type": "string", "enum": ["linear_move", "rotate", "head_position", "wait"]},
                 "parameters": {
                     "type": "object",
-                    "description": "Action parameters. MUST include all required fields for the action type. For rotate: angle_degrees (number), speed (number). For linear_move: distance_cm (number), speed (number). For head_position: pan_degrees (number), tilt_degrees (number). For wait: empty object."
+                    "properties": {
+                        "distance_cm": {"type": "number", "description": "Distance in cm for linear_move (10-50)"},
+                        "angle_degrees": {"type": "number", "description": "Angle in degrees for rotate (-90 to 90). NEGATIVE=left, POSITIVE=right"},
+                        "speed": {"type": "number", "description": "Speed 0-100 for linear_move and rotate (typically 30-50)"},
+                        "pan_degrees": {"type": "number", "description": "Pan angle for head_position (-90 to 90)"},
+                        "tilt_degrees": {"type": "number", "description": "Tilt angle for head_position (-45 to 45)"}
+                    },
+                    "description": "Include only the parameters needed for your chosen action type. For rotate: angle_degrees, speed. For linear_move: distance_cm, speed. For head_position: pan_degrees, tilt_degrees. For wait: empty object."
                 }
             },
             "required": ["type", "parameters"]
