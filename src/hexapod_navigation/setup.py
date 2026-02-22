@@ -25,6 +25,7 @@ setup(
     entry_points={
         'console_scripts': [
             'bottle_seeker = hexapod_navigation.bottle_seeker:main',
+            'gemini_bridge = hexapod_navigation.gemini_bridge:main',
         ],
     },
 )
