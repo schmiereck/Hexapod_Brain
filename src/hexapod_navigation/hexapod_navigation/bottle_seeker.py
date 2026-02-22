@@ -31,7 +31,7 @@ class BottleSeeker(Node):
         self.declare_parameter('target_classes', ['bottle', 'person'])
         self.declare_parameter('min_confidence', 0.5)
         self.declare_parameter('head_scan_positions', [-60.0, -30.0, 0.0, 30.0, 60.0])
-        self.declare_parameter('head_tilt_angle', -70.0)
+        self.declare_parameter('head_tilt_angle', -75.0)
         self.declare_parameter('head_scan_delay', 0.5)
         self.declare_parameter('image_width', 640)
         self.declare_parameter('center_tolerance', 0.2)
