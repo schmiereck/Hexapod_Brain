@@ -300,6 +300,7 @@ You control a real physical robot. Your decisions have consequences. Always prio
 """
 
 # JSON Schema for enforcing structured responses
+# Note: Gemini API doesn't support oneOf, anyOf, etc. Keep schema simple!
 RESPONSE_SCHEMA = {
     "type": "object",
     "properties": {
@@ -319,37 +320,7 @@ RESPONSE_SCHEMA = {
                 "type": {"type": "string", "enum": ["linear_move", "rotate", "head_position", "wait"]},
                 "parameters": {
                     "type": "object",
-                    "oneOf": [
-                        {
-                            "description": "Parameters for linear_move action",
-                            "properties": {
-                                "distance_cm": {"type": "number", "minimum": -100, "maximum": 100},
-                                "speed": {"type": "number", "minimum": 0, "maximum": 100}
-                            },
-                            "required": ["distance_cm", "speed"]
-                        },
-                        {
-                            "description": "Parameters for rotate action",
-                            "properties": {
-                                "angle_degrees": {"type": "number", "minimum": -180, "maximum": 180},
-                                "speed": {"type": "number", "minimum": 0, "maximum": 100}
-                            },
-                            "required": ["angle_degrees", "speed"]
-                        },
-                        {
-                            "description": "Parameters for head_position action",
-                            "properties": {
-                                "pan_degrees": {"type": "number", "minimum": -90, "maximum": 90},
-                                "tilt_degrees": {"type": "number", "minimum": -90, "maximum": 90}
-                            },
-                            "required": ["pan_degrees", "tilt_degrees"]
-                        },
-                        {
-                            "description": "Parameters for wait action (empty)",
-                            "properties": {},
-                            "additionalProperties": False
-                        }
-                    ]
+                    "description": "Action parameters. MUST include all required fields for the action type. For rotate: angle_degrees (number), speed (number). For linear_move: distance_cm (number), speed (number). For head_position: pan_degrees (number), tilt_degrees (number). For wait: empty object."
                 }
             },
             "required": ["type", "parameters"]
