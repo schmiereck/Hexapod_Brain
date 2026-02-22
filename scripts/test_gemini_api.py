@@ -60,7 +60,7 @@ def test_simple_generation(api_key):
         import google.generativeai as genai
         genai.configure(api_key=api_key)
         
-        model = genai.GenerativeModel('gemini-2.0-flash-exp')
+        model = genai.GenerativeModel('gemini-robotics-er-1.5-preview')
         response = model.generate_content("Say 'Hello Robot!' in one sentence.")
         
         print(f"   Response: {response.text}")
@@ -86,7 +86,7 @@ def test_json_schema():
         }
         
         model = genai.GenerativeModel(
-            'gemini-2.0-flash-exp',
+            'gemini-robotics-er-1.5-preview',
             generation_config={
                 "response_mime_type": "application/json",
                 "response_schema": schema
@@ -115,7 +115,7 @@ def test_multimodal():
         # Create simple test image (red square)
         img = Image.new('RGB', (100, 100), color='red')
         
-        model = genai.GenerativeModel('gemini-2.0-flash-exp')
+        model = genai.GenerativeModel('gemini-robotics-er-1.5-preview')
         response = model.generate_content([
             "What color is this image?",
             img

@@ -22,8 +22,8 @@ def generate_launch_description():
     
     model_name_arg = DeclareLaunchArgument(
         'model_name',
-        default_value='gemini-2.0-flash-exp',
-        description='Gemini model to use'
+        default_value='gemini-robotics-er-1.5-preview',
+        description='Gemini model to use (robotics-specialized model)'
     )
     
     timeout_arg = DeclareLaunchArgument(

@@ -6,6 +6,7 @@ Phase 3 requires Google Gemini API access for LLM-based robot control. The Gemin
 ## Prerequisites
 - Google Cloud account with Gemini API access
 - API key from https://makersuite.google.com/app/apikey
+- Access to **Gemini Robotics ER 1.5 Preview** model (robotics-specialized)
 - SSH access to ubuntu1 (192.168.2.133)
 
 ## Setup Steps
@@ -52,7 +53,7 @@ Expected output:
 
 3. Testing API connection...
    Available models:
-     - models/gemini-2.0-flash-exp
+     - models/gemini-robotics-er-1.5-preview
      - models/gemini-1.5-pro
      ...
    ✅ API connection successful
@@ -96,7 +97,10 @@ google.api_core.exceptions.PermissionDenied: 403 API key not valid
 ```
 google.api_core.exceptions.NotFound: 404 Model not found
 ```
-**Solution**: Try different model name (e.g., `gemini-1.5-pro` instead of `gemini-2.0-flash-exp`)
+**Solution**: 
+- Verify access to `gemini-robotics-er-1.5-preview` model
+- Model might be in preview/early access - check https://ai.google.dev/
+- Fallback: Use `gemini-1.5-pro` for testing (not robotics-specialized)
 
 ## Next Steps
 After successful API test:
@@ -105,8 +109,9 @@ After successful API test:
 3. Test with live robot and camera
 
 ## Cost Considerations
-- Gemini 2.0 Flash: ~$0.01 per request (multimodal)
-- Development: ~100 requests = $1
+- Gemini Robotics ER 1.5 Preview: Pricing may vary (preview model)
+- Estimated: ~$0.01-0.02 per request (multimodal, robotics-specialized)
+- Development: ~100 requests = $1-2
 - Keep track at: https://console.cloud.google.com/billing
 
 ## Security

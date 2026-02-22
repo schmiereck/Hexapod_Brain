@@ -195,10 +195,13 @@ ros2 action list
 # /raspclaws/head_position
 ```
 
-### "Gemini API error: 403"
+### "Gemini API error: 403" oder "Model not found"
 - API Key ungültig → https://makersuite.google.com/app/apikey
 - Billing nicht aktiviert → https://console.cloud.google.com/billing
-- API nicht enabled → https://console.cloud.google.com/apis
+- Robotics ER model nicht zugänglich (Preview) → Request access oder use fallback:
+  ```bash
+  ros2 launch hexapod_navigation gemini_bridge.launch.py model_name:='gemini-1.5-pro'
+  ```
 
 ### "Robot zappelt"
 - Sollte NICHT passieren (two-stage callbacks implementiert)
@@ -212,8 +215,10 @@ ros2 action list
 | **Gemini API Latenz** | 1-3 Sekunden pro Entscheidung |
 | **Control Loop** | 1 Hz (1 Entscheidung/Sekunde) |
 | **Gesamt-Latenz** | 3-5 Sekunden pro Aktion |
-| **API Cost** | ~$0.01 pro Entscheidung (multimodal) |
-| **Session Cost** | ~$0.10-0.50 (10-50 Entscheidungen) |
+| **API Cost** | ~$0.01-0.02 pro Entscheidung (robotics-specialized) |
+| **Session Cost** | ~$0.10-1.00 (10-50 Entscheidungen) |
+
+**Model**: `gemini-robotics-er-1.5-preview` - spezialisiert für Robotik mit Vision-Language-Action
 
 **Vergleich zu bottle_seeker**:
 - bottle_seeker: 10 Hz, ~0.1s pro Iteration, instant decisions

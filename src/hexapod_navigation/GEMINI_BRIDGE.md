@@ -91,6 +91,7 @@ ros2 topic echo /hexapod/reasoning
 
 ### Launch with Custom Parameters
 ```bash
+# Use fallback model if robotics-er not available
 ros2 launch hexapod_navigation gemini_bridge.launch.py \
   model_name:='gemini-1.5-pro' \
   timeout:=180.0 \
@@ -102,7 +103,7 @@ ros2 launch hexapod_navigation gemini_bridge.launch.py \
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `gemini_api_key` | `''` | API key (or use GEMINI_API_KEY env var) |
-| `model_name` | `gemini-2.0-flash-exp` | Gemini model to use |
+| `model_name` | `gemini-robotics-er-1.5-preview` | Gemini model (robotics-specialized) |
 | `timeout` | `120.0` | Max time for goal completion (seconds) |
 | `image_topic` | `/raspclaws/camera/image_raw/compressed` | Camera topic |
 | `detection_topic` | `/hexapod/detections` | YOLO detections topic |

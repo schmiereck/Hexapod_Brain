@@ -1,6 +1,9 @@
 """
 System instruction for Gemini Embodied Reasoning in Hexapod Robot.
 This prompt defines the robot's role, constraints, and response format.
+
+Designed for: gemini-robotics-er-1.5-preview
+(Robotics-specialized model with Vision-Language-Action capabilities)
 """
 
 SYSTEM_INSTRUCTION = """
