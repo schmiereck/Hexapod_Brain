@@ -27,7 +27,7 @@
 - State machines need careful action tracking to prevent command spam
 - Stabilization delays critical for smooth movement (0.25s between actions)
 
-## 📋 Current Phase (Phase 3 - Gemini Robotics ER)
+## ✅ Completed (Phase 3 - Gemini Robotics ER)
 1.  **Create hexapod_navigation Package**:
     - Navigation node that subscribes to `/hexapod/detections`
     - Implements behavior logic (e.g., "approach detected person")
@@ -57,7 +57,30 @@ New node `gemini_bridge.py` that implements:
 
 ### Implementation Tasks (Phase 3)
 
-**Status**: 🚀 In Progress
+**Status**: ✅ Complete
+
+**Results**:
+- Gemini Bridge node successfully implemented (440 lines)
+- 5-state machine: IDLE → SENSING → REASONING → ACTING → EVALUATING
+- Multimodal AI reasoning (camera + detections → actions)
+- SayCan principle: Goal + Skills → LLM decides next action
+- JSON schema enforcement with explicit parameter properties
+- Successfully tested: Robot finds bottle, centers it via rotation, approaches
+- Two critical bugs found and fixed:
+  1. Parameter generation (needed explicit schema properties)
+  2. Rotation logic (was inverted left/right)
+
+**Lessons Learned**:
+- google.generativeai schema requires explicit `properties` definition, not just descriptions
+- LLM understands spatial reasoning (x coordinates vs. center) very well
+- Prompt engineering crucial: Examples must be 100% correct
+- Head position not used yet (only body rotation) - could improve precision
+- System works but YOLO limits semantic understanding
+
+**Known Limitations**:
+- YOLO only detects 80 COCO classes (bottle, person, chair, etc.)
+- Cannot understand arbitrary objects ("red cube", "toy car", "door")
+- Head position skill underutilized (Gemini prefers body rotation)
 
 #### Core Components:
 1. ✅ **Skill Registry**: Define all ROS2 Actions with descriptions for LLM
@@ -194,9 +217,49 @@ Da du eine externe Kamera hast, implementieren wir ein **"Dual-Guard"-Prinzip**:
 
 ---
 
-### Nächster Schritt für dich
+## 📋 Current Phase (Phase 4 - Pure Vision AI)
 
-Damit das funktioniert, müssen wir die **Koordinaten-Transformation** klären. Gemini gibt "normalisierte" Werte (0 bis 1000) für Bildpunkte zurück.
+### Goal
+Remove YOLO dependency entirely. Use Gemini's native vision understanding for:
+- Arbitrary object recognition ("Find the red cube", "Go to the door")
+- Scene understanding beyond 80 COCO classes
+- Semantic spatial reasoning without structured detections
+- True multimodal AI control
 
-**Soll ich dir ein mathematisches Mapping-Skript entwerfen, das Gemini-Pixel-Koordinaten aus der Hypervisor-Kamera in reale Meter-Koordinaten für dein ROS 2 `WalkTo` Action-Goal umrechnet?**
+### Why Remove YOLO?
+**Current limitations:**
+- YOLO: Only 80 classes (bottle, person, chair, etc.)
+- Cannot find: "red objects", "doors", "toys", "specific shapes"
+- Gemini is limited to reasoning over YOLO's pre-classified detections
+- Semantic gap: User says "red thing" → YOLO sees nothing → Gemini blind
+
+**Benefits of Pure Vision:**
+- Unlimited semantic understanding (any object, color, shape)
+- Natural language goals work directly ("Find something red")
+- Simpler architecture (one AI system, not two)
+- Lower latency (no YOLO preprocessing)
+- More flexible behavior
+
+### Architecture Changes
+**Before (Phase 3):**
+```
+Camera → YOLO → Detections JSON → Gemini → Actions
+```
+
+**After (Phase 4):**
+```
+Camera → Gemini (direct vision) → Actions
+```
+
+### Implementation Tasks
+1. ⏳ **Test Pure Vision Mode**: Add `use_yolo: false` parameter to gemini_bridge
+2. ⏳ **Update System Instruction**: Remove detection-specific prompts, add vision analysis
+3. ⏳ **Benchmark Performance**: Compare latency/cost (YOLO+Gemini vs. Pure Gemini)
+4. ⏳ **Integration Testing**: Test with non-YOLO objects ("red cup", "wooden block")
+5. ⏳ **Head Position Utilization**: Improve prompts to encourage camera scanning
+
+### Notes
+- Keep YOLO code for fallback/comparison
+- May need to increase Gemini timeout (vision-only might be slower)
+- Consider prompt engineering to request structured vision output
 
