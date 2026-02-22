@@ -32,7 +32,7 @@ class BottleSeeker(Node):
         self.declare_parameter('min_confidence', 0.5)
         self.declare_parameter('head_scan_positions', [-60.0, -30.0, 0.0, 30.0, 60.0])
         self.declare_parameter('head_tilt_angle', -70.0)
-        self.declare_parameter('head_scan_delay', 1.0)
+        self.declare_parameter('head_scan_delay', 0.5)
         self.declare_parameter('image_width', 640)
         self.declare_parameter('center_tolerance', 0.2)
         self.declare_parameter('rotation_step', 15.0)
@@ -41,7 +41,7 @@ class BottleSeeker(Node):
         self.declare_parameter('goal_bottle_width', 120.0)
         self.declare_parameter('search_timeout', 60.0)
         self.declare_parameter('detection_lost_timeout', 3.0)
-        self.declare_parameter('stabilization_delay', 0.5)
+        self.declare_parameter('stabilization_delay', 0.25)
         
         # Get parameters
         self.target_classes = self.get_parameter('target_classes').value
