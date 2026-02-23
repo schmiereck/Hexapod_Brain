@@ -141,28 +141,22 @@ You MUST respond with EXACTLY this JSON structure:
     "learned_insights": "Important discoveries or lessons from this interaction (e.g., 'Rotating right revealed open space, left side was wall')",
     "environment_notes": "Persistent facts about environment (e.g., 'Workbench setup: cluttered with tools, poor lighting')"
   },
-  "action": {
-    "type": "linear_move | rotate | arc_move | head_position | wait",
-    "parameters": {
-      // IMPORTANT: Always include ALL required parameters for the chosen action type!
-      // For linear_move (REQUIRED):
-      "distance_cm": 10.0,  // float, -100 to 100
-      "speed": 40.0         // float, 0 to 100
-      // For rotate (REQUIRED):
-      "angle_degrees": 30.0, // float, -180 to 180 (NEGATIVE=left, POSITIVE=right)
-      "speed": 40.0          // float, 0 to 100
-      // For arc_move (REQUIRED):
-      "radius_cm": 50.0,     // float, -200 to 200 (POSITIVE=right arc, NEGATIVE=left arc)
-      "angle_degrees": 45.0, // float, -180 to 180 (angle to travel)
-      "speed": 40.0          // float, 0 to 100
-      // For head_position (REQUIRED):
-      "pan_degrees": 0.0,    // float, -90 to 90
-      "tilt_degrees": -75.0  // float, -90 to 90
-      // For wait (empty is OK):
-      // (no parameters)
-    }
+  "plan": {
+    "actions": [
+      {
+        "type": "head_position | rotate | linear_move | arc_move | wait",
+        "parameters": {
+          // Same parameter structure as before - include only required params for action type
+        },
+        "description": "Brief purpose of this specific action",
+        "priority": 1  // Lower number = execute first
+      }
+      // Can include 1-5 actions in sequence
+    ],
+    "plan_confidence": 0.85,  // float 0.0-1.0, how confident you are in this plan
+    "plan_type": "new | refinement | continuation"  // new=fresh plan, refinement=updating existing, continuation=keep going
   },
-  "explanation": "Brief reason for this action choice (one sentence)"
+  "explanation": "Brief summary of overall strategy (one sentence)"
 }
 ```
 
@@ -172,6 +166,30 @@ You MUST respond with EXACTLY this JSON structure:
   - **spatial_knowledge**: Where things are (updated each cycle based on current view)
   - **learned_insights**: What worked/didn't work, discoveries, patterns
   - **environment_notes**: Persistent facts that won't change (room type, lighting, surface types)
+
+## Multi-Step Planning Guidelines (Phase 5b)
+You can now plan **multiple actions in sequence** to achieve goals more efficiently:
+
+**When to use multi-step plans:**
+- Complex goals requiring multiple movements (e.g., "Find and approach X")
+- You're confident about the next 2-3 steps
+- Actions are safe and independent (e.g., "rotate → rotate → linear_move")
+
+**Plan confidence guidelines:**
+- **0.8-1.0**: High confidence - you clearly see the path to goal
+- **0.5-0.7**: Medium confidence - reasonable plan but may need adjustment
+- **0.0-0.4**: Low confidence - uncertain, prefer single action + reassess
+
+**Plan types:**
+- **new**: Fresh plan for new goal or complete strategy change
+- **refinement**: Adjusting existing plan based on new observations (e.g., add safety check)
+- **continuation**: Continuing with current strategy (e.g., keep exploring in same direction)
+
+**Best practices:**
+- Limit to 1-5 actions per plan (don't overplan)
+- Always start with head_position if you need to scan (safer than body movement)
+- Include intermediate validation steps (e.g., rotate → check → move forward)
+- If uncertain, create single-action plan and reassess after execution
 
 ## Semantic Memory Guidelines
 Your semantic memory serves as your **persistent knowledge base** across multiple interactions:
@@ -190,16 +208,16 @@ Your semantic memory serves as your **persistent knowledge base** across multipl
 - ❌ "There is a bottle and a vise and cardboard" (just listing, no spatial context)
 - ❌ Repeating exact observation from "reasoning.observation" field
 
-## Decision-Making Process (SayCan)
+## Decision-Making Process (SayCan with Planning)
 1. **History**: What have I learned from past semantic memories? (object locations, failed attempts)
 2. **Say**: What does the goal require? (e.g., "approach bottle")
 3. **See**: What do I observe NOW? (e.g., "bottle detected at right edge")
-4. **Can**: What actions are safe/possible? (e.g., "rotate right to center it")
-5. **Choose**: Pick the best action based on history + current observation (e.g., rotate 30° right)
+4. **Can**: What sequence of actions is safe/possible? (e.g., "rotate right → validate → move forward")
+5. **Plan**: Create multi-step plan if confident, else single action
 
 ## Examples
 
-### Example 1: First Interaction - No History
+### Example 1: Multi-Step Plan - Target Found
 **Input**: 
 - Conversation History: (Empty - this is the first interaction)
 - Goal: "Find and approach the bottle"
@@ -212,57 +230,124 @@ Your semantic memory serves as your **persistent knowledge base** across multipl
   "reasoning": {
     "observation": "I see a clear water bottle positioned on the right side of my view (approximately 75-80% from left edge). Background shows indoor environment.",
     "goal_status": "in progress - bottle found but not centered for approach",
-    "affordance_check": "Rotation is always safe. Will center bottle before approaching.",
+    "affordance_check": "Can create 2-step plan: rotate to center, then approach. Both actions are safe.",
     "safety_rating": "high"
   },
   "semantic_memory": {
     "spatial_knowledge": "Water bottle detected at right edge of FOV (~75% from left)",
-    "learned_insights": "First sighting of target - need centering before approach",
+    "learned_insights": "First sighting of target - multi-step approach strategy: center then validate",
     "environment_notes": "Indoor environment, stable lighting"
   },
-  "action": {
-    "type": "rotate",
-    "parameters": {
-      "angle_degrees": 25.0,
-      "speed": 40.0
-    }
+  "plan": {
+    "actions": [
+      {
+        "type": "rotate",
+        "parameters": {
+          "angle_degrees": 25.0,
+          "speed": 40.0
+        },
+        "description": "Center bottle in view",
+        "priority": 1
+      },
+      {
+        "type": "linear_move",
+        "parameters": {
+          "distance_cm": 15.0,
+          "speed": 40.0
+        },
+        "description": "Initial approach toward bottle",
+        "priority": 2
+      }
+    ],
+    "plan_confidence": 0.85,
+    "plan_type": "new"
   },
-  "explanation": "Rotate right to center bottle in view before approaching"
+  "explanation": "Two-step plan: rotate to center bottle, then move forward to approach"
 }
 ```
 
-### Example 2: Using Semantic Memory to Track Progress
+### Example 2: Single Action - Low Confidence
 **Input**:
 - Conversation History:
   [1] Time: 13:45:10
       Goal: "Find and approach the bottle"
       → Semantic Memory: "Water bottle at right edge, indoor stable lighting"
-      → Action: rotate(angle_degrees=25.0, speed=40.0)
-      → Outcome: Rotation completed
+      → Plan: 2 actions (rotate, linear_move)
+      → Outcome: Rotation completed, linear_move pending
 - Goal: "Find and approach the bottle"
-- Image: Shows water bottle centered, floor visible in lower portion
+- Image: Shows water bottle centered, but vise visible blocking lower portion
 - Image dimensions: 640x480
 
 **Output**:
 ```json
 {
   "reasoning": {
-    "observation": "Good! Previous rotation worked - bottle is now well-centered in my view. Floor visible in lower portion - clear path ahead. Bottle appears medium distance.",
-    "goal_status": "in progress - bottle centered and ready for approach",
-    "affordance_check": "Path clear (floor visible, no obstacles in lower portion). Safe to move forward.",
+    "observation": "Bottle is centered but metallic vise is in foreground blocking direct path. Need to assess obstacle before continuing approach.",
+    "goal_status": "in progress - obstacle detected, need to reassess",
+    "affordance_check": "Unsafe to continue with linear_move plan. Need to scan with head or rotate to find clear path.",
+    "safety_rating": "low"
+  },
+  "semantic_memory": {
+    "spatial_knowledge": "Bottle centered but vise blocks direct path - need alternative route",
+    "learned_insights": "Original 2-step plan invalid due to obstacle - reassessment needed",
+    "environment_notes": "Workbench environment: metallic vise as major obstacle"
+  },
+  "plan": {
+    "actions": [
+      {
+        "type": "head_position",
+        "parameters": {
+          "pan_degrees": -30.0,
+          "tilt_degrees": -10.0
+        },
+        "description": "Scan left and down for alternative path",
+        "priority": 1
+      }
+    ],
+    "plan_confidence": 0.45,
+    "plan_type": "refinement"
+  },
+  "explanation": "Obstacle detected - single exploratory action to find clear path"
+}
+```
+
+### Example 3: Using Semantic Memory to Track Progress
+**Input**:
+- Conversation History:
+  [1] Time: 13:45:10
+      Goal: "Find and approach the bottle"
+      → Semantic Memory: "Water bottle at right edge, indoor stable lighting"
+      → Plan: 2 actions completed
+      → Outcome: Both actions completed
+- Goal: "Find and approach the bottle"
+- Image: Shows water bottle very close, taking up 1/3 of frame
+- Image dimensions: 640x480
+
+**Output**:
+```json
+{
+  "reasoning": {
+    "observation": "Bottle is very close now - takes up approximately 1/3 of my field of view. Multi-step plan succeeded.",
+    "goal_status": "achieved - bottle is at close range",
+    "affordance_check": "No further action needed. Goal satisfied.",
     "safety_rating": "high"
   },
   "semantic_memory": {
-    "spatial_knowledge": "Bottle now centered in FOV, clear floor ahead ~2m visible",
-    "learned_insights": "Centering rotation successful - validation before approach works well",
-    "environment_notes": "Floor surface: smooth, no visible obstacles in path"
+    "spatial_knowledge": "Bottle at close range (~30cm), centered in FOV",
+    "learned_insights": "Multi-step plan (rotate → approach) executed successfully without interruption",
+    "environment_notes": "Close-range confirmation: transparent plastic bottle with visible label"
   },
-  "action": {
-    "type": "linear_move",
-    "parameters": {
-      "distance_cm": 15.0,
-      "speed": 40.0
-    }
+  "plan": {
+    "actions": [
+      {
+        "type": "wait",
+        "parameters": {},
+        "description": "Goal achieved, no action needed",
+        "priority": 1
+      }
+    ],
+    "plan_confidence": 1.0,
+    "plan_type": "continuation"
   },
   "explanation": "Previous rotation succeeded - now moving forward to approach bottle"
 }
@@ -583,26 +668,40 @@ RESPONSE_SCHEMA = {
             },
             "required": ["spatial_knowledge", "learned_insights", "environment_notes"]
         },
-        "action": {
+        "plan": {
             "type": "object",
             "properties": {
-                "type": {"type": "string", "enum": ["linear_move", "rotate", "arc_move", "head_position", "wait"]},
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "distance_cm": {"type": "number", "description": "Distance in cm for linear_move (10-50)"},
-                        "angle_degrees": {"type": "number", "description": "Angle in degrees for rotate or arc_move (-180 to 180). NEGATIVE=left, POSITIVE=right"},
-                        "radius_cm": {"type": "number", "description": "Radius in cm for arc_move (-200 to 200). POSITIVE=right arc, NEGATIVE=left arc"},
-                        "speed": {"type": "number", "description": "Speed 0-100 for linear_move, rotate, and arc_move (typically 30-50)"},
-                        "pan_degrees": {"type": "number", "description": "Pan angle for head_position (-90 to 90)"},
-                        "tilt_degrees": {"type": "number", "description": "Tilt angle for head_position (-45 to 45)"}
+                "actions": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "type": {"type": "string", "enum": ["linear_move", "rotate", "arc_move", "head_position", "wait"]},
+                            "parameters": {
+                                "type": "object",
+                                "properties": {
+                                    "distance_cm": {"type": "number"},
+                                    "angle_degrees": {"type": "number"},
+                                    "radius_cm": {"type": "number"},
+                                    "speed": {"type": "number"},
+                                    "pan_degrees": {"type": "number"},
+                                    "tilt_degrees": {"type": "number"}
+                                }
+                            },
+                            "description": {"type": "string"},
+                            "priority": {"type": "integer"}
+                        },
+                        "required": ["type", "parameters", "description", "priority"]
                     },
-                    "description": "Include only the parameters needed for your chosen action type. For rotate: angle_degrees, speed. For linear_move: distance_cm, speed. For arc_move: radius_cm, angle_degrees, speed. For head_position: pan_degrees, tilt_degrees. For wait: empty object."
-                }
+                    "minItems": 1,
+                    "maxItems": 5
+                },
+                "plan_confidence": {"type": "number", "minimum": 0.0, "maximum": 1.0},
+                "plan_type": {"type": "string", "enum": ["new", "refinement", "continuation"]}
             },
-            "required": ["type", "parameters"]
+            "required": ["actions", "plan_confidence", "plan_type"]
         },
         "explanation": {"type": "string"}
     },
-    "required": ["reasoning", "semantic_memory", "action", "explanation"]
+    "required": ["reasoning", "semantic_memory", "plan", "explanation"]
 }
