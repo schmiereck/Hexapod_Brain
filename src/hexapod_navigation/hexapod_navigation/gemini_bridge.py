@@ -52,6 +52,7 @@ class GeminiBridge(Node):
         self.declare_parameter('max_retries', 3)
         self.declare_parameter('retry_delay', 2.0)
         self.declare_parameter('use_yolo', False)  # Phase 4: Pure vision mode by default
+        self.declare_parameter('max_history_length', 8)  # Phase 5a: Conversation history
         
         # Get parameters
         api_key = self.get_parameter('gemini_api_key').value
@@ -69,6 +70,7 @@ class GeminiBridge(Node):
         self.max_retries = self.get_parameter('max_retries').value
         self.retry_delay = self.get_parameter('retry_delay').value
         self.use_yolo = self.get_parameter('use_yolo').value
+        self.max_history_length = self.get_parameter('max_history_length').value
         
         # Configure Gemini API
         self.client = genai.Client(api_key=api_key)
@@ -96,6 +98,9 @@ class GeminiBridge(Node):
         
         # Gemini response
         self.last_gemini_response: Optional[Dict[str, Any]] = None
+        
+        # Phase 5a: Conversation history
+        self.conversation_history = []  # List of dicts: {timestamp, goal, observation, action, outcome}
         
         # Subscribers
         self.image_sub = self.create_subscription(
@@ -441,6 +446,50 @@ Look for objects, obstacles, spatial relationships, and anything relevant to the
         msg = String()
         msg.data = f'{self.state.name}:{status}'
         self.status_pub.publish(msg)
+    
+    # Phase 5a: History management methods
+    
+    def _add_to_history(self, goal: str, observation: str, action: Dict[str, Any], outcome: str):
+        """Add entry to conversation history and maintain max length."""
+        entry = {
+            'timestamp': time.time(),
+            'goal': goal,
+            'observation': observation,
+            'action': action,
+            'outcome': outcome
+        }
+        self.conversation_history.append(entry)
+        
+        # Trim if exceeds max length
+        if len(self.conversation_history) > self.max_history_length:
+            removed = self.conversation_history.pop(0)  # Remove oldest
+            self.get_logger().debug(f'History trimmed: removed entry from {time.ctime(removed["timestamp"])}')
+        
+        self.get_logger().info(f'📝 History updated: {len(self.conversation_history)}/{self.max_history_length} entries')
+    
+    def _format_history_for_prompt(self) -> str:
+        """Format conversation history as string for Gemini prompt."""
+        if not self.conversation_history:
+            return "**Conversation History**: (Empty - this is the first interaction)"
+        
+        history_str = f"**Conversation History** (Last {len(self.conversation_history)} exchanges):\n"
+        for i, entry in enumerate(self.conversation_history, 1):
+            timestamp_str = time.strftime('%H:%M:%S', time.localtime(entry['timestamp']))
+            action_type = entry['action'].get('type', 'unknown')
+            action_params = entry['action'].get('parameters', {})
+            
+            history_str += f"\n[{i}] Time: {timestamp_str}\n"
+            history_str += f"    Goal: \"{entry['goal']}\"\n"
+            history_str += f"    → Observation: {entry['observation'][:100]}...\n"  # Truncate long observations
+            history_str += f"    → Action: {action_type}({action_params})\n"
+            history_str += f"    → Outcome: {entry['outcome']}\n"
+        
+        return history_str
+    
+    def clear_history(self):
+        """Clear conversation history (e.g., on explicit user reset)."""
+        self.conversation_history.clear()
+        self.get_logger().info('🗑️ Conversation history cleared')
 
 
 def main(args=None):
