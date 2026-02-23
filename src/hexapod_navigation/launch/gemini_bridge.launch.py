@@ -62,6 +62,12 @@ def generate_launch_description():
         description='Delay between retries (seconds)'
     )
     
+    use_yolo_arg = DeclareLaunchArgument(
+        'use_yolo',
+        default_value='false',
+        description='Use YOLO detections (true=Phase 3, false=Phase 4 pure vision)'
+    )
+    
     # Node
     gemini_bridge_node = Node(
         package='hexapod_navigation',
@@ -77,6 +83,7 @@ def generate_launch_description():
             'control_loop_hz': LaunchConfiguration('control_loop_hz'),
             'max_retries': LaunchConfiguration('max_retries'),
             'retry_delay': LaunchConfiguration('retry_delay'),
+            'use_yolo': LaunchConfiguration('use_yolo'),
         }]
     )
     
@@ -89,5 +96,6 @@ def generate_launch_description():
         control_loop_hz_arg,
         max_retries_arg,
         retry_delay_arg,
+        use_yolo_arg,
         gemini_bridge_node,
     ])

@@ -51,6 +51,7 @@ class GeminiBridge(Node):
         self.declare_parameter('control_loop_hz', 1.0)
         self.declare_parameter('max_retries', 3)
         self.declare_parameter('retry_delay', 2.0)
+        self.declare_parameter('use_yolo', False)  # Phase 4: Pure vision mode by default
         
         # Get parameters
         api_key = self.get_parameter('gemini_api_key').value
@@ -67,6 +68,7 @@ class GeminiBridge(Node):
         self.control_loop_hz = self.get_parameter('control_loop_hz').value
         self.max_retries = self.get_parameter('max_retries').value
         self.retry_delay = self.get_parameter('retry_delay').value
+        self.use_yolo = self.get_parameter('use_yolo').value
         
         # Configure Gemini API
         self.client = genai.Client(api_key=api_key)
@@ -76,7 +78,8 @@ class GeminiBridge(Node):
             "response_schema": RESPONSE_SCHEMA,
             "system_instruction": SYSTEM_INSTRUCTION
         }
-        self.get_logger().info(f'Gemini client configured: {self.model_name}')
+        mode_str = "YOLO+Gemini (Phase 3)" if self.use_yolo else "Pure Vision (Phase 4)"
+        self.get_logger().info(f'Gemini client configured: {self.model_name} - Mode: {mode_str}')
         
         # State
         self.state = State.IDLE
@@ -101,12 +104,19 @@ class GeminiBridge(Node):
             self.image_callback,
             10
         )
-        self.detection_sub = self.create_subscription(
-            Detection2DArray,
-            self.detection_topic,
-            self.detection_callback,
-            10
-        )
+        # Conditional YOLO subscription (Phase 4)
+        if self.use_yolo:
+            self.detection_sub = self.create_subscription(
+                Detection2DArray,
+                self.detection_topic,
+                self.detection_callback,
+                10
+            )
+            self.get_logger().info(f'📊 YOLO mode enabled: Subscribing to {self.detection_topic}')
+        else:
+            self.detection_sub = None
+            self.get_logger().info('👁️ Pure vision mode: YOLO disabled')
+        
         self.goal_sub = self.create_subscription(
             String,
             '/hexapod/goal',
@@ -205,10 +215,12 @@ class GeminiBridge(Node):
         
         # Prepare input
         image_pil = self._compressed_to_pil(self.latest_image)
-        detections_json = self._detections_to_json(self.latest_detections)
         
-        # Build prompt
-        prompt = f"""
+        # Build prompt (conditional based on use_yolo)
+        if self.use_yolo:
+            # Phase 3: YOLO + Gemini mode
+            detections_json = self._detections_to_json(self.latest_detections)
+            prompt = f"""
 **Current Goal**: {self.current_goal}
 
 **Image Dimensions**: {self.image_width} x {self.image_height} pixels
@@ -217,6 +229,16 @@ class GeminiBridge(Node):
 {json.dumps(detections_json, indent=2)}
 
 Based on this input, what action should I take next?
+"""
+        else:
+            # Phase 4: Pure vision mode (no YOLO)
+            prompt = f"""
+**Current Goal**: {self.current_goal}
+
+**Image Dimensions**: {self.image_width} x {self.image_height} pixels
+
+Analyze the camera image directly and decide what action to take next.
+Look for objects, obstacles, spatial relationships, and anything relevant to the goal.
 """
         
         # Call Gemini with retry logic
