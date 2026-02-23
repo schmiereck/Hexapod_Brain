@@ -197,12 +197,13 @@ class GeminiBridge(Node):
         """Collect perception data."""
         self.publish_status('SENSING')
         
-        # Check if we have both image and detections
+        # Check if we have image (required in all modes)
         if self.latest_image is None:
             self.get_logger().warn('No image received yet', throttle_duration_sec=5.0)
             return
         
-        if self.latest_detections is None:
+        # In YOLO mode, also wait for detections
+        if self.use_yolo and self.latest_detections is None:
             self.get_logger().warn('No detections received yet', throttle_duration_sec=5.0)
             return
         
