@@ -162,11 +162,20 @@ class GeminiBridge(Node):
     
     def goal_callback(self, msg: String):
         """Receive new goal from user."""
+        new_goal = msg.data
+        
+        # Phase 5a: Detect goal changes (even during execution)
+        if self.current_goal is not None and self.current_goal != new_goal:
+            self.get_logger().warn(f'⚠️ GOAL CHANGED during execution!')
+            self.get_logger().info(f'   Old: "{self.current_goal}"')
+            self.get_logger().info(f'   New: "{new_goal}"')
+            # History preserved for spatial memory, but plan is obsolete
+            
         if self.state != State.IDLE:
             self.get_logger().warn(f'Goal received while in state {self.state.name}, ignoring')
             return
         
-        self.current_goal = msg.data
+        self.current_goal = new_goal
         self.start_time = time.time()
         self.get_logger().info(f'🎯 New goal received: "{self.current_goal}"')
         self.transition_to(State.SENSING)
@@ -222,11 +231,16 @@ class GeminiBridge(Node):
         # Prepare input
         image_pil = self._compressed_to_pil(self.latest_image)
         
+        # Phase 5a: Format conversation history
+        history_section = self._format_history_for_prompt()
+        
         # Build prompt (conditional based on use_yolo)
         if self.use_yolo:
             # Phase 3: YOLO + Gemini mode
             detections_json = self._detections_to_json(self.latest_detections)
             prompt = f"""
+{history_section}
+
 **Current Goal**: {self.current_goal}
 
 **Image Dimensions**: {self.image_width} x {self.image_height} pixels
@@ -239,6 +253,8 @@ Based on this input, what action should I take next?
         else:
             # Phase 4: Pure vision mode (no YOLO)
             prompt = f"""
+{history_section}
+
 **Current Goal**: {self.current_goal}
 
 **Image Dimensions**: {self.image_width} x {self.image_height} pixels
@@ -279,6 +295,16 @@ Look for objects, obstacles, spatial relationships, and anything relevant to the
                 self.get_logger().info(f"   Safety: {response_json['reasoning']['safety_rating']}")
                 self.get_logger().info(f"   Action: {response_json['action']['type']}")
                 self.get_logger().info(f"   Explanation: {response_json['explanation']}")
+                
+                # Phase 5a: Add to conversation history
+                observation_text = response_json['reasoning']['observation']
+                action_data = response_json['action']
+                self._add_to_history(
+                    goal=self.current_goal,
+                    observation=observation_text,
+                    action=action_data,
+                    outcome="Pending execution"  # Will be updated in state_evaluating
+                )
                 
                 self.transition_to(State.ACTING)
                 return
@@ -402,6 +428,11 @@ Look for objects, obstacles, spatial relationships, and anything relevant to the
         self.last_action_time = time.time()
         success = (result.status == 4)  # GoalStatus.STATUS_SUCCEEDED
         self.get_logger().info(f'✅ Action complete (success={success})')
+        
+        # Phase 5a: Update last history entry outcome
+        if self.conversation_history:
+            outcome = "Action completed successfully" if success else "Action failed"
+            self.conversation_history[-1]['outcome'] = outcome
         
         # Move to evaluation
         self.transition_to(State.EVALUATING)
