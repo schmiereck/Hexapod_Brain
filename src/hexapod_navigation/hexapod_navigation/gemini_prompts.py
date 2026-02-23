@@ -136,6 +136,11 @@ You MUST respond with EXACTLY this JSON structure:
     "affordance_check": "Is my planned action safe and physically possible right now?",
     "safety_rating": "high | medium | low"
   },
+  "semantic_memory": {
+    "spatial_knowledge": "Compact summary of object locations and spatial layout learned this cycle (e.g., 'Bottle is to my right, vise in center blocking path')",
+    "learned_insights": "Important discoveries or lessons from this interaction (e.g., 'Rotating right revealed open space, left side was wall')",
+    "environment_notes": "Persistent facts about environment (e.g., 'Workbench setup: cluttered with tools, poor lighting')"
+  },
   "action": {
     "type": "linear_move | rotate | arc_move | head_position | wait",
     "parameters": {
@@ -161,10 +166,32 @@ You MUST respond with EXACTLY this JSON structure:
 }
 ```
 
-**CRITICAL**: The `parameters` field must ALWAYS contain the required parameters for your chosen action type. Never leave parameters empty unless action type is "wait"!
+**CRITICAL**: 
+- The `parameters` field must ALWAYS contain the required parameters for your chosen action type. Never leave parameters empty unless action type is "wait"!
+- The `semantic_memory` section is your "notebook" - write down what you learned for future reference
+  - **spatial_knowledge**: Where things are (updated each cycle based on current view)
+  - **learned_insights**: What worked/didn't work, discoveries, patterns
+  - **environment_notes**: Persistent facts that won't change (room type, lighting, surface types)
+
+## Semantic Memory Guidelines
+Your semantic memory serves as your **persistent knowledge base** across multiple interactions:
+
+1. **Be Concise**: Each field should be 1-2 sentences max. Focus on actionable knowledge.
+2. **Update Incrementally**: Don't repeat what's already in history - add NEW insights only.
+3. **Think Long-term**: Write notes that will help you if the goal changes or you return to this area later.
+
+**Good semantic memory examples:**
+- spatial_knowledge: "Bottle located 30° right from center, metallic vise blocks direct path"
+- learned_insights: "Two right rotations didn't reveal target - left exploration more promising"
+- environment_notes: "Indoor workbench scene, cluttered with metallic tools, stable lighting"
+
+**Bad semantic memory examples:**
+- ❌ "I rotated" (too vague, doesn't add knowledge)
+- ❌ "There is a bottle and a vise and cardboard" (just listing, no spatial context)
+- ❌ Repeating exact observation from "reasoning.observation" field
 
 ## Decision-Making Process (SayCan)
-1. **History**: What have I learned from past observations? (object locations, failed attempts)
+1. **History**: What have I learned from past semantic memories? (object locations, failed attempts)
 2. **Say**: What does the goal require? (e.g., "approach bottle")
 3. **See**: What do I observe NOW? (e.g., "bottle detected at right edge")
 4. **Can**: What actions are safe/possible? (e.g., "rotate right to center it")
@@ -188,6 +215,11 @@ You MUST respond with EXACTLY this JSON structure:
     "affordance_check": "Rotation is always safe. Will center bottle before approaching.",
     "safety_rating": "high"
   },
+  "semantic_memory": {
+    "spatial_knowledge": "Water bottle detected at right edge of FOV (~75% from left)",
+    "learned_insights": "First sighting of target - need centering before approach",
+    "environment_notes": "Indoor environment, stable lighting"
+  },
   "action": {
     "type": "rotate",
     "parameters": {
@@ -199,12 +231,12 @@ You MUST respond with EXACTLY this JSON structure:
 }
 ```
 
-### Example 2: Using History to Track Progress
+### Example 2: Using Semantic Memory to Track Progress
 **Input**:
 - Conversation History:
   [1] Time: 13:45:10
       Goal: "Find and approach the bottle"
-      → Observation: I see a clear water bottle on the right side...
+      → Semantic Memory: "Water bottle at right edge, indoor stable lighting"
       → Action: rotate(angle_degrees=25.0, speed=40.0)
       → Outcome: Rotation completed
 - Goal: "Find and approach the bottle"
@@ -219,6 +251,11 @@ You MUST respond with EXACTLY this JSON structure:
     "goal_status": "in progress - bottle centered and ready for approach",
     "affordance_check": "Path clear (floor visible, no obstacles in lower portion). Safe to move forward.",
     "safety_rating": "high"
+  },
+  "semantic_memory": {
+    "spatial_knowledge": "Bottle now centered in FOV, clear floor ahead ~2m visible",
+    "learned_insights": "Centering rotation successful - validation before approach works well",
+    "environment_notes": "Floor surface: smooth, no visible obstacles in path"
   },
   "action": {
     "type": "linear_move",
@@ -236,12 +273,12 @@ You MUST respond with EXACTLY this JSON structure:
 - Conversation History:
   [1] Time: 13:45:10
       Goal: "Find and approach the bottle"
-      → Observation: I see a water bottle on right...
+      → Semantic Memory: "Water bottle at right edge, indoor stable lighting"
       → Action: rotate(angle_degrees=25.0)
       → Outcome: Rotation completed
   [2] Time: 13:45:25  
       Goal: "Find and approach the bottle"
-      → Observation: Bottle centered, moving forward...
+      → Semantic Memory: "Bottle centered, clear floor ahead ~2m, smooth surface"
       → Action: linear_move(distance_cm=15.0)
       → Outcome: Movement completed
 - Goal: "Stop and look for a red object"  ← NEW GOAL!
@@ -252,10 +289,87 @@ You MUST respond with EXACTLY this JSON structure:
 ```json
 {
   "reasoning": {
+    "observation": "GOAL CHANGED! Previous goal was 'approach bottle', now it's 'find red object'. I know bottle is here from history but that's not my goal anymore. I can see bottle and various items on workbench - need to scan for red objects.",
+    "goal_status": "not started - new goal, need to search for red objects",
+    "affordance_check": "Head scanning is safest way to search. Will pan left to scan workbench area.",
+    "safety_rating": "high"
+  },
+  "semantic_memory": {
+    "spatial_knowledge": "Bottle directly ahead (old target), workbench with multiple objects visible in background",
+    "learned_insights": "Goal changed - previous spatial knowledge about bottle still valid but not relevant to new task",
+    "environment_notes": "Workbench environment: multiple objects, need systematic scan for color identification"
+  },
+  "action": {
+    "type": "head_position",
+    "parameters": {
+      "pan_degrees": -45.0,
+      "tilt_degrees": 0.0
+    }
+  },
+  "explanation": "New goal detected - starting fresh search for red objects by panning camera left"
+}
+```
+
+### Example 4: Learning from Failed Actions
+**Input**:
+- Conversation History:
+  [1] Time: 14:10:05
+      Goal: "Find the bottle"
+      → Semantic Memory: "No bottle visible, indoor open space"
+      → Action: rotate(angle_degrees=30.0, direction=right)
+      → Outcome: Rotation completed
+  [2] Time: 14:10:20
+      Goal: "Find the bottle"  
+      → Semantic Memory: "Still no bottle, wall visible on right side"
+      → Action: rotate(angle_degrees=30.0, direction=right)
+      → Outcome: Rotation completed
+- Goal: "Find the bottle"
+- Image: Shows wall on right, open space on left
+
+**Output**:
+```json
+{
+  "reasoning": {
+    "observation": "Rotated right twice already (60° total) - still no bottle. Seeing wall on right. This direction is not productive. Should try opposite direction (left) to explore other areas.",
+    "goal_status": "not started - bottle not found after 2 attempts in same direction",
+    "affordance_check": "Rotation is always safe. Changing strategy - rotate left to explore other direction.",
+    "safety_rating": "high"
+  },
+  "semantic_memory": {
+    "spatial_knowledge": "Wall on right side, open space visible on left - asymmetric environment",
+    "learned_insights": "Right rotation strategy unproductive (2x attempts, only found wall). Left exploration needed.",
+    "environment_notes": "Environment has wall boundary on right - constrains search space"
+  },
+  "action": {
+    "type": "rotate",
+    "parameters": {
+      "angle_degrees": -45.0,
+      "speed": 40.0
+    }
+  },
+  "explanation": "Previous right rotations unproductive - trying left direction instead"
+}
+```
+
+### Example 5: Object Very Close - Goal Achieved
+**Input**:
+- Goal: "Approach the bottle"
+- Image: Shows bottle taking up significant portion of view (1/3 of frame width)
+- Image dimensions: 640x480
+
+**Output**:
+```json
+{
+  "reasoning": {
     "observation": "Bottle is very close now - takes up approximately 1/3 of my field of view. I can see details like the label and cap.",
     "goal_status": "achieved - bottle is close enough",
     "affordance_check": "No action needed. Goal satisfied.",
     "safety_rating": "high"
+  },
+  "semantic_memory": {
+    "spatial_knowledge": "Bottle at close range (~30cm estimated), centered in FOV",
+    "learned_insights": "Multi-step approach successful: center → validate → approach works reliably",
+    "environment_notes": "Close-range vision confirmed: transparent plastic bottle with visible label"
   },
   "action": {
     "type": "wait",
@@ -460,6 +574,15 @@ RESPONSE_SCHEMA = {
             },
             "required": ["observation", "goal_status", "affordance_check", "safety_rating"]
         },
+        "semantic_memory": {
+            "type": "object",
+            "properties": {
+                "spatial_knowledge": {"type": "string", "description": "Compact summary of object locations and spatial layout learned this cycle"},
+                "learned_insights": {"type": "string", "description": "Important discoveries or lessons from this interaction"},
+                "environment_notes": {"type": "string", "description": "Persistent facts about environment"}
+            },
+            "required": ["spatial_knowledge", "learned_insights", "environment_notes"]
+        },
         "action": {
             "type": "object",
             "properties": {
@@ -481,5 +604,5 @@ RESPONSE_SCHEMA = {
         },
         "explanation": {"type": "string"}
     },
-    "required": ["reasoning", "action", "explanation"]
+    "required": ["reasoning", "semantic_memory", "action", "explanation"]
 }

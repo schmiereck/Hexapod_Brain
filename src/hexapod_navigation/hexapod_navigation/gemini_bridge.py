@@ -296,12 +296,24 @@ Look for objects, obstacles, spatial relationships, and anything relevant to the
                 self.get_logger().info(f"   Action: {response_json['action']['type']}")
                 self.get_logger().info(f"   Explanation: {response_json['explanation']}")
                 
-                # Phase 5a: Add to conversation history
-                observation_text = response_json['reasoning']['observation']
+                # Log semantic memory
+                if 'semantic_memory' in response_json:
+                    mem = response_json['semantic_memory']
+                    self.get_logger().info(f'🧠 Semantic Memory:')
+                    self.get_logger().info(f"   Spatial: {mem.get('spatial_knowledge', 'N/A')}")
+                    self.get_logger().info(f"   Insights: {mem.get('learned_insights', 'N/A')}")
+                    self.get_logger().info(f"   Environment: {mem.get('environment_notes', 'N/A')}")
+                
+                # Phase 5a: Add to conversation history with semantic memory
+                semantic_memory = response_json.get('semantic_memory', {
+                    'spatial_knowledge': response_json['reasoning']['observation'][:100],
+                    'learned_insights': 'No insights recorded',
+                    'environment_notes': 'No environment notes'
+                })
                 action_data = response_json['action']
                 self._add_to_history(
                     goal=self.current_goal,
-                    observation=observation_text,
+                    semantic_memory=semantic_memory,
                     action=action_data,
                     outcome="Pending execution"  # Will be updated in state_evaluating
                 )
@@ -480,12 +492,12 @@ Look for objects, obstacles, spatial relationships, and anything relevant to the
     
     # Phase 5a: History management methods
     
-    def _add_to_history(self, goal: str, observation: str, action: Dict[str, Any], outcome: str):
-        """Add entry to conversation history and maintain max length."""
+    def _add_to_history(self, goal: str, semantic_memory: Dict[str, str], action: Dict[str, Any], outcome: str):
+        """Add entry to conversation history with semantic memory and maintain max length."""
         entry = {
             'timestamp': time.time(),
             'goal': goal,
-            'observation': observation,
+            'semantic_memory': semantic_memory,  # Store semantic memory instead of raw observation
             'action': action,
             'outcome': outcome
         }
@@ -509,11 +521,21 @@ Look for objects, obstacles, spatial relationships, and anything relevant to the
             action_type = entry['action'].get('type', 'unknown')
             action_params = entry['action'].get('parameters', {})
             
-            history_str += f"\n[{i}] Time: {timestamp_str}\n"
-            history_str += f"    Goal: \"{entry['goal']}\"\n"
-            history_str += f"    → Observation: {entry['observation'][:100]}...\n"  # Truncate long observations
-            history_str += f"    → Action: {action_type}({action_params})\n"
-            history_str += f"    → Outcome: {entry['outcome']}\n"
+            # Use semantic memory if available, fallback to observation for backward compatibility
+            if 'semantic_memory' in entry:
+                memory = entry['semantic_memory']
+                history_str += f"\n[{i}] Time: {timestamp_str}\n"
+                history_str += f"    Goal: \"{entry['goal']}\"\n"
+                history_str += f"    → Semantic Memory: {memory.get('spatial_knowledge', 'N/A')}\n"
+                history_str += f"    → Action: {action_type}({action_params})\n"
+                history_str += f"    → Outcome: {entry['outcome']}\n"
+            else:
+                # Backward compatibility for old format
+                history_str += f"\n[{i}] Time: {timestamp_str}\n"
+                history_str += f"    Goal: \"{entry['goal']}\"\n"
+                history_str += f"    → Observation: {entry.get('observation', 'N/A')[:100]}...\n"
+                history_str += f"    → Action: {action_type}({action_params})\n"
+                history_str += f"    → Outcome: {entry['outcome']}\n"
         
         return history_str
     
