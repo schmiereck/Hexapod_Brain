@@ -166,15 +166,28 @@ class GeminiBridge(Node):
         self.latest_detections = msg
     
     def goal_callback(self, msg: String):
-        """Receive new goal from user."""
+        """Receive new goal from user (Phase 5b: Can interrupt ongoing execution)."""
         new_goal = msg.data
         
-        # Phase 5a: Detect goal changes (even during execution)
+        # Phase 5b: Detect goal changes (even during execution)
         if self.current_goal is not None and self.current_goal != new_goal:
             self.get_logger().warn(f'⚠️ GOAL CHANGED during execution!')
             self.get_logger().info(f'   Old: "{self.current_goal}"')
             self.get_logger().info(f'   New: "{new_goal}"')
-            # History preserved for spatial memory, but plan is obsolete
+            
+            # Phase 5b: Clear action queue - old plan is obsolete
+            self.clear_action_queue()
+            
+            # Cancel current action if one is running
+            if self.action_in_progress:
+                self.get_logger().warn('⚠️ Interrupting current action (goal changed)')
+                # Note: We can't easily cancel ROS2 action goals mid-execution
+                # Mark as interrupted and wait for completion
+                self.action_in_progress = False  # Force state machine to restart
+            
+            # History preserved for spatial memory (Gemini will see goal change in next call)
+            # Force state back to IDLE to accept new goal
+            self.state = State.IDLE
             
         if self.state != State.IDLE:
             self.get_logger().warn(f'Goal received while in state {self.state.name}, ignoring')
