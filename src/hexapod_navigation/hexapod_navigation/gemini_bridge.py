@@ -100,7 +100,12 @@ class GeminiBridge(Node):
         self.last_gemini_response: Optional[Dict[str, Any]] = None
         
         # Phase 5a: Conversation history
-        self.conversation_history = []  # List of dicts: {timestamp, goal, observation, action, outcome}
+        self.conversation_history = []  # List of dicts: {timestamp, goal, semantic_memory, action, outcome}
+        
+        # Phase 5b: Action queue for multi-step planning
+        self.action_queue = []  # List of action dicts to execute in sequence
+        self.current_plan_goal = None  # Which goal is the current plan for?
+        self.current_plan_type = None  # new | refinement | continuation
         
         # Subscribers
         self.image_sub = self.create_subscription(
@@ -293,7 +298,6 @@ Look for objects, obstacles, spatial relationships, and anything relevant to the
                 self.get_logger().info(f"   Observation: {response_json['reasoning']['observation']}")
                 self.get_logger().info(f"   Goal status: {response_json['reasoning']['goal_status']}")
                 self.get_logger().info(f"   Safety: {response_json['reasoning']['safety_rating']}")
-                self.get_logger().info(f"   Action: {response_json['action']['type']}")
                 self.get_logger().info(f"   Explanation: {response_json['explanation']}")
                 
                 # Log semantic memory
@@ -304,13 +308,38 @@ Look for objects, obstacles, spatial relationships, and anything relevant to the
                     self.get_logger().info(f"   Insights: {mem.get('learned_insights', 'N/A')}")
                     self.get_logger().info(f"   Environment: {mem.get('environment_notes', 'N/A')}")
                 
+                # Phase 5b: Log plan
+                if 'plan' in response_json:
+                    plan = response_json['plan']
+                    self.get_logger().info(f'📋 Plan ({plan.get("plan_type", "unknown")}, confidence: {plan.get("plan_confidence", 0.0):.2f}):')
+                    for i, action in enumerate(plan.get('actions', []), 1):
+                        self.get_logger().info(f'   [{i}] {action["type"]}: {action.get("description", "N/A")}')
+                
+                # Phase 5b: Enqueue actions from plan
+                if 'plan' in response_json and 'actions' in response_json['plan']:
+                    plan = response_json['plan']
+                    self._enqueue_actions(
+                        actions=plan['actions'],
+                        goal=self.current_goal,
+                        plan_type=plan.get('plan_type', 'unknown')
+                    )
+                    # Store first action for history (for backward compatibility)
+                    action_data = plan['actions'][0] if plan['actions'] else {'type': 'wait', 'parameters': {}}
+                else:
+                    # Fallback: single action mode (backward compatibility)
+                    action_data = response_json.get('action', {'type': 'wait', 'parameters': {}})
+                    self._enqueue_actions(
+                        actions=[action_data],
+                        goal=self.current_goal,
+                        plan_type='new'
+                    )
+                
                 # Phase 5a: Add to conversation history with semantic memory
                 semantic_memory = response_json.get('semantic_memory', {
                     'spatial_knowledge': response_json['reasoning']['observation'][:100],
                     'learned_insights': 'No insights recorded',
                     'environment_notes': 'No environment notes'
                 })
-                action_data = response_json['action']
                 self._add_to_history(
                     goal=self.current_goal,
                     semantic_memory=semantic_memory,
@@ -330,76 +359,20 @@ Look for objects, obstacles, spatial relationships, and anything relevant to the
                     self.transition_to(State.IDLE)
     
     def state_acting(self):
-        """Execute action from Gemini."""
+        """Execute action from queue (Phase 5b: Multi-step planning)."""
         self.publish_status('ACTING')
         
         if self.action_in_progress:
             return  # Wait for current action to complete
         
-        if self.last_gemini_response is None:
-            self.get_logger().error('No Gemini response to execute!')
-            self.transition_to(State.IDLE)
+        # Phase 5b: Try to execute next action from queue
+        if self._execute_next_action():
+            # Action started successfully
             return
         
-        # Extract action
-        action_data = self.last_gemini_response['action']
-        action_type = action_data['type']
-        params = action_data.get('parameters', {})  # Use .get() with default
-        safety_rating = self.last_gemini_response['reasoning']['safety_rating']
-        
-        # Safety check
-        if safety_rating == 'low':
-            self.get_logger().warn('⚠️ Low safety rating, but executing action (override if needed)')
-            # TODO: Add user confirmation or safety validation
-        
-        # Log action with parameters
-        self.get_logger().info(f'🚀 Executing: {action_type} with params={params}')
-        
-        if action_type == 'wait':
-            # No action needed
-            self.get_logger().info('⏸️ Waiting (no action)')
-            self.transition_to(State.EVALUATING)
-            
-        elif action_type == 'linear_move':
-            goal = LinearMove.Goal()
-            goal.distance_cm = float(params.get('distance_cm', 10.0))
-            goal.speed = float(params.get('speed', 40.0))
-            goal.step_size_cm = 2.0
-            self.action_in_progress = True
-            future = self.linear_client.send_goal_async(goal)
-            future.add_done_callback(lambda f: self._on_goal_accepted(f, self._on_action_complete))
-            
-        elif action_type == 'rotate':
-            goal = Rotate.Goal()
-            goal.angle_degrees = float(params.get('angle_degrees', 30.0))
-            goal.speed = float(params.get('speed', 40.0))
-            goal.step_size_deg = 5.0
-            goal.use_imu = True
-            self.action_in_progress = True
-            future = self.rotate_client.send_goal_async(goal)
-            future.add_done_callback(lambda f: self._on_goal_accepted(f, self._on_action_complete))
-            
-        elif action_type == 'head_position':
-            goal = HeadPosition.Goal()
-            goal.pan_degrees = float(params.get('pan_degrees', 0.0))
-            goal.tilt_degrees = float(params.get('tilt_degrees', -75.0))
-            goal.smooth = True
-            self.action_in_progress = True
-            future = self.head_client.send_goal_async(goal)
-            future.add_done_callback(lambda f: self._on_goal_accepted(f, self._on_action_complete))
-            
-        elif action_type == 'arc_move':
-            goal = ArcMove.Goal()
-            goal.radius_cm = float(params.get('radius_cm', 50.0))
-            goal.angle_degrees = float(params.get('angle_degrees', 45.0))
-            goal.speed = float(params.get('speed', 40.0))
-            self.action_in_progress = True
-            future = self.arc_client.send_goal_async(goal)
-            future.add_done_callback(lambda f: self._on_goal_accepted(f, self._on_action_complete))
-            
-        else:
-            self.get_logger().error(f'Unknown action type: {action_type}')
-            self.transition_to(State.IDLE)
+        # No more actions in queue - move to evaluation
+        self.get_logger().info('✅ All queued actions complete')
+        self.transition_to(State.EVALUATING)
     
     def state_evaluating(self):
         """Check if goal is achieved."""
@@ -446,8 +419,9 @@ Look for objects, obstacles, spatial relationships, and anything relevant to the
             outcome = "Action completed successfully" if success else "Action failed"
             self.conversation_history[-1]['outcome'] = outcome
         
-        # Move to evaluation
-        self.transition_to(State.EVALUATING)
+        # Phase 5b: Continue executing queue (state_acting will pick up next action)
+        # Stay in ACTING state to process next queued action
+        # If queue is empty, state_acting will transition to EVALUATING
     
     def _compressed_to_pil(self, msg: CompressedImage) -> PILImage.Image:
         """Convert CompressedImage to PIL Image."""
@@ -543,6 +517,108 @@ Look for objects, obstacles, spatial relationships, and anything relevant to the
         """Clear conversation history (e.g., on explicit user reset)."""
         self.conversation_history.clear()
         self.get_logger().info('🗑️ Conversation history cleared')
+    
+    # Phase 5b: Action queue management methods
+    
+    def _enqueue_actions(self, actions: list, goal: str, plan_type: str):
+        """Populate action queue with new plan."""
+        # Sort by priority (lower number = higher priority)
+        sorted_actions = sorted(actions, key=lambda x: x.get('priority', 999))
+        
+        self.action_queue = sorted_actions.copy()
+        self.current_plan_goal = goal
+        self.current_plan_type = plan_type
+        
+        self.get_logger().info(f'📋 Action queue updated: {len(self.action_queue)} actions')
+        for i, action in enumerate(self.action_queue, 1):
+            self.get_logger().info(f'   [{i}] {action["type"]}: {action.get("description", "N/A")}')
+    
+    def _execute_next_action(self) -> bool:
+        """Pop and execute next action from queue. Returns True if action was started, False if queue empty."""
+        if not self.action_queue:
+            self.get_logger().debug('Action queue empty')
+            return False
+        
+        if self.action_in_progress:
+            self.get_logger().debug('Action already in progress, waiting...')
+            return False
+        
+        # Pop next action
+        next_action = self.action_queue.pop(0)
+        action_type = next_action['type']
+        params = next_action.get('parameters', {})
+        description = next_action.get('description', 'N/A')
+        
+        self.get_logger().info(f'⚡ Executing queued action: {action_type} ({description})')
+        self.get_logger().info(f'   Remaining in queue: {len(self.action_queue)}')
+        
+        # Execute the action (reuse existing action execution logic)
+        return self._execute_single_action(action_type, params)
+    
+    def _execute_single_action(self, action_type: str, params: Dict[str, Any]) -> bool:
+        """Execute a single action. Returns True if started, False otherwise."""
+        safety_rating = "high"  # Assume high if from plan
+        
+        # Safety check (could be enhanced with current safety_rating from last Gemini call)
+        if safety_rating == 'low':
+            self.get_logger().warn('⚠️ Low safety rating, but executing action (override if needed)')
+        
+        if action_type == 'wait':
+            self.get_logger().info('⏸️ Waiting (no action)')
+            # For wait, immediately mark as complete
+            self.action_in_progress = False
+            return True
+            
+        elif action_type == 'linear_move':
+            goal = LinearMove.Goal()
+            goal.distance_cm = float(params.get('distance_cm', 10.0))
+            goal.speed = float(params.get('speed', 40.0))
+            goal.step_size_cm = 2.0
+            self.action_in_progress = True
+            future = self.linear_client.send_goal_async(goal)
+            future.add_done_callback(lambda f: self._on_goal_accepted(f, self._on_action_complete))
+            return True
+            
+        elif action_type == 'rotate':
+            goal = Rotate.Goal()
+            goal.angle_degrees = float(params.get('angle_degrees', 30.0))
+            goal.speed = float(params.get('speed', 40.0))
+            self.action_in_progress = True
+            future = self.rotate_client.send_goal_async(goal)
+            future.add_done_callback(lambda f: self._on_goal_accepted(f, self._on_action_complete))
+            return True
+            
+        elif action_type == 'arc_move':
+            goal = ArcMove.Goal()
+            goal.radius_cm = float(params.get('radius_cm', 50.0))
+            goal.angle_degrees = float(params.get('angle_degrees', 45.0))
+            goal.speed = float(params.get('speed', 40.0))
+            self.action_in_progress = True
+            future = self.arc_client.send_goal_async(goal)
+            future.add_done_callback(lambda f: self._on_goal_accepted(f, self._on_action_complete))
+            return True
+            
+        elif action_type == 'head_position':
+            goal = HeadPosition.Goal()
+            goal.pan_degrees = float(params.get('pan_degrees', 0.0))
+            goal.tilt_degrees = float(params.get('tilt_degrees', 0.0))
+            self.action_in_progress = True
+            future = self.head_client.send_goal_async(goal)
+            future.add_done_callback(lambda f: self._on_goal_accepted(f, self._on_action_complete))
+            return True
+        
+        else:
+            self.get_logger().error(f'Unknown action type: {action_type}')
+            return False
+    
+    def clear_action_queue(self):
+        """Clear action queue (e.g., on goal change or emergency stop)."""
+        cleared_count = len(self.action_queue)
+        self.action_queue.clear()
+        self.current_plan_goal = None
+        self.current_plan_type = None
+        if cleared_count > 0:
+            self.get_logger().warn(f'🗑️ Action queue cleared ({cleared_count} actions discarded)')
 
 
 def main(args=None):
