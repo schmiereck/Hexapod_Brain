@@ -30,7 +30,26 @@ It is designed to run on a separate compute node (e.g., Raspberry Pi 5 "ubuntu1"
    source install/setup.bash
    ```
 
-4. **Run**
-   ```bash
-   ros2 launch hexapod_vision yolo_detector.launch.py
-   ```
+   4. **Run**
+      **old Yolo detector:**
+      ```bash
+      ros2 launch hexapod_vision yolo_detector.launch.py
+      ```
+      **new Gemini bridge:**
+      ```bash
+      cd ~/Hexapod_Brain
+      source ~/Hexapod_Brain/setup_env.bash
+      ros2 launch hexapod_navigation gemini_bridge.launch.py
+
+      ```
+           parameter('gemini_api_key', '')
+           parameter('model_name', 'models/gemini-robotics-er-1.5-preview')
+           parameter('timeout', 600.0)
+           parameter('image_topic', '/raspclaws/camera/image_raw/compressed')
+           parameter('detection_topic', '/hexapod/detections')
+           parameter('control_loop_hz', 1.0)
+           parameter('max_retries', 3)
+           parameter('retry_delay', 2.0)
+           parameter('use_yolo', False)  # Phase 4: Pure vision mode by default
+           parameter('max_history_length', 8)  # Phase 5a: Conversation history
+      ```

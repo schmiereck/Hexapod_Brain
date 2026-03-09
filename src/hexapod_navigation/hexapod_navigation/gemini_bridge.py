@@ -45,7 +45,7 @@ class GeminiBridge(Node):
         # Parameters
         self.declare_parameter('gemini_api_key', '')
         self.declare_parameter('model_name', 'models/gemini-robotics-er-1.5-preview')
-        self.declare_parameter('timeout', 120.0)
+        self.declare_parameter('timeout', 600.0)
         self.declare_parameter('image_topic', '/raspclaws/camera/image_raw/compressed')
         self.declare_parameter('detection_topic', '/hexapod/detections')
         self.declare_parameter('control_loop_hz', 1.0)
