@@ -27,6 +27,7 @@ It is designed to run on a separate compute node (e.g., Raspberry Pi 5 "ubuntu1"
 3. **Build ROS2 Workspace**
    ```bash
    colcon build
+   colcon build --symlink-install --packages-select hexapod_navigation
    source install/setup.bash
    ```
 
@@ -40,8 +41,16 @@ It is designed to run on a separate compute node (e.g., Raspberry Pi 5 "ubuntu1"
       cd ~/Hexapod_Brain
       source ~/Hexapod_Brain/setup_env.bash
       ros2 launch hexapod_navigation gemini_bridge.launch.py
-
       ```
+
+      **Change Parameter:**
+      ```bash
+      ros2 launch hexapod_navigation gemini_bridge.launch.py --show-args
+      
+      nano src/hexapod_navigation/config/gemini_bridge_params.yaml
+      
+      ros2 run hexapod_navigation gemini_bridge --ros-args -p timeout:=900.0
+      
            parameter('gemini_api_key', '')
            parameter('model_name', 'models/gemini-robotics-er-1.5-preview')
            parameter('timeout', 600.0)

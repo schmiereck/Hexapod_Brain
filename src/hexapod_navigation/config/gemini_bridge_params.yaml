@@ -1,0 +1,10 @@
+gemini_bridge:
+  ros__parameters:
+    model_name: "models/gemini-robotics-er-1.5-preview"
+    timeout: 600.0
+    image_topic: "/raspclaws/camera/image_raw/compressed"
+    detection_topic: "/hexapod/detections"
+    control_loop_hz: 1.0
+    max_retries: 3
+    retry_delay: 2.0
+    use_yolo: False
