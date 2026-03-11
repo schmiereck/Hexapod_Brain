@@ -266,7 +266,7 @@ Your semantic memory serves as your **persistent knowledge base** across multipl
 }
 ```
 
-### Example 2: Single Action - Low Confidence
+### Example 2: Obstacle Detected - Refinement Plan
 **Input**:
 - Conversation History:
   [1] Time: 13:45:10
@@ -311,7 +311,7 @@ Your semantic memory serves as your **persistent knowledge base** across multipl
 }
 ```
 
-### Example 3: Using Semantic Memory to Track Progress
+### Example 3: Goal Achieved - Continuation Plan
 **Input**:
 - Conversation History:
   [1] Time: 13:45:10
@@ -353,143 +353,10 @@ Your semantic memory serves as your **persistent knowledge base** across multipl
 }
 ```
 
-### Example 3: Goal Changed Mid-Task - Adapt Immediately
-**Input**:
-- Conversation History:
-  [1] Time: 13:45:10
-      Goal: "Find and approach the bottle"
-      → Semantic Memory: "Water bottle at right edge, indoor stable lighting"
-      → Action: rotate(angle_degrees=25.0)
-      → Outcome: Rotation completed
-  [2] Time: 13:45:25  
-      Goal: "Find and approach the bottle"
-      → Semantic Memory: "Bottle centered, clear floor ahead ~2m, smooth surface"
-      → Action: linear_move(distance_cm=15.0)
-      → Outcome: Movement completed
-- Goal: "Stop and look for a red object"  ← NEW GOAL!
-- Image: Shows bottle still visible, workbench with various items in background
-- Image dimensions: 640x480
-
-**Output**:
-```json
-{
-  "reasoning": {
-    "observation": "GOAL CHANGED! Previous goal was 'approach bottle', now it's 'find red object'. I know bottle is here from history but that's not my goal anymore. I can see bottle and various items on workbench - need to scan for red objects.",
-    "goal_status": "not started - new goal, need to search for red objects",
-    "affordance_check": "Head scanning is safest way to search. Will pan left to scan workbench area.",
-    "safety_rating": "high"
-  },
-  "semantic_memory": {
-    "spatial_knowledge": "Bottle directly ahead (old target), workbench with multiple objects visible in background",
-    "learned_insights": "Goal changed - previous spatial knowledge about bottle still valid but not relevant to new task",
-    "environment_notes": "Workbench environment: multiple objects, need systematic scan for color identification"
-  },
-  "action": {
-    "type": "head_position",
-    "parameters": {
-      "pan_degrees": -45.0,
-      "tilt_degrees": 0.0
-    }
-  },
-  "explanation": "New goal detected - starting fresh search for red objects by panning camera left"
-}
-```
-
-### Example 4: Learning from Failed Actions
-**Input**:
-- Conversation History:
-  [1] Time: 14:10:05
-      Goal: "Find the bottle"
-      → Semantic Memory: "No bottle visible, indoor open space"
-      → Action: rotate(angle_degrees=30.0, direction=right)
-      → Outcome: Rotation completed
-  [2] Time: 14:10:20
-      Goal: "Find the bottle"  
-      → Semantic Memory: "Still no bottle, wall visible on right side"
-      → Action: rotate(angle_degrees=30.0, direction=right)
-      → Outcome: Rotation completed
-- Goal: "Find the bottle"
-- Image: Shows wall on right, open space on left
-
-**Output**:
-```json
-{
-  "reasoning": {
-    "observation": "Rotated right twice already (60° total) - still no bottle. Seeing wall on right. This direction is not productive. Should try opposite direction (left) to explore other areas.",
-    "goal_status": "not started - bottle not found after 2 attempts in same direction",
-    "affordance_check": "Rotation is always safe. Changing strategy - rotate left to explore other direction.",
-    "safety_rating": "high"
-  },
-  "semantic_memory": {
-    "spatial_knowledge": "Wall on right side, open space visible on left - asymmetric environment",
-    "learned_insights": "Right rotation strategy unproductive (2x attempts, only found wall). Left exploration needed.",
-    "environment_notes": "Environment has wall boundary on right - constrains search space"
-  },
-  "action": {
-    "type": "rotate",
-    "parameters": {
-      "angle_degrees": -45.0,
-      "speed": 40.0
-    }
-  },
-  "explanation": "Previous right rotations unproductive - trying left direction instead"
-}
-```
-
-### Example 5: Object Very Close - Goal Achieved
-**Input**:
-- Goal: "Approach the bottle"
-- Image: Shows bottle taking up significant portion of view (1/3 of frame width)
-- Image dimensions: 640x480
-
-**Output**:
-```json
-{
-  "reasoning": {
-    "observation": "Bottle is very close now - takes up approximately 1/3 of my field of view. I can see details like the label and cap.",
-    "goal_status": "achieved - bottle is close enough",
-    "affordance_check": "No action needed. Goal satisfied.",
-    "safety_rating": "high"
-  },
-  "semantic_memory": {
-    "spatial_knowledge": "Bottle at close range (~30cm estimated), centered in FOV",
-    "learned_insights": "Multi-step approach successful: center → validate → approach works reliably",
-    "environment_notes": "Close-range vision confirmed: transparent plastic bottle with visible label"
-  },
-  "action": {
-    "type": "wait",
-    "parameters": {}
-  },
-  "explanation": "Goal achieved - bottle is close enough, stopping"
-}
-```
-
-### Example 4: No Object Detected - Search with Head First
+### Example 4: Search Mode - No Object Detected
 **Input**:
 - Goal: "Find the bottle"
 - Detections: []
-- Image: 640x480
-
-**Output**:
-```json
-{
-  "reasoning": {
-    "observation": "No bottle detected in current view. Need to scan environment.",
-    "goal_status": "not started - target not found yet",
-    "affordance_check": "Head scanning is always safe and efficient. Will pan camera left first.",
-    "safety_rating": "high"
-  },
-  "action": {
-    "type": "wait",
-    "parameters": {}
-  },
-  "explanation": "Goal achieved - bottle is now at close range"
-}
-```
-
-### Example 4: Search Mode - Use Head First (RECOMMENDED) - Pure Vision
-**Input**:
-- Goal: "Find the bottle"
 - Image: Shows indoor scene with floor and furniture, no bottle visible in center
 - Image dimensions: 640x480
 
@@ -502,122 +369,124 @@ Your semantic memory serves as your **persistent knowledge base** across multipl
     "affordance_check": "Head movement always safe and energy efficient. Will scan left first.",
     "safety_rating": "high"
   },
-  "action": {
-    "type": "head_position",
-    "parameters": {
-      "pan_degrees": -45.0,
-      "tilt_degrees": -75.0
-    }
+  "semantic_memory": {
+    "spatial_knowledge": "Currently viewing center forward, empty floor with furniture",
+    "learned_insights": "Target not in direct forward view, initiating head scan sequence",
+    "environment_notes": "Indoor room with standard furniture"
   },
-  "explanation": "Pan camera left to search for bottle without moving body (energy efficient)"
+  "plan": {
+    "actions": [
+      {
+        "type": "head_position",
+        "parameters": {
+          "pan_degrees": -45.0,
+          "tilt_degrees": -15.0
+        },
+        "description": "Pan camera left to search for bottle without moving body",
+        "priority": 1
+      }
+    ],
+    "plan_confidence": 0.6,
+    "plan_type": "new"
+  },
+  "explanation": "No bottle detected, initiating energy-efficient head scan to the left"
 }
 ```
 
-### Example 5: Continue Searching - Head Scan Right - Pure Vision
+### Example 5: Goal Changed Mid-Task - Adapt Immediately
 **Input**:
+- Conversation History:
+  [1] Time: 13:45:10
+      Goal: "Find and approach the bottle"
+      → Semantic Memory: "Water bottle at right edge, indoor stable lighting"
+      → Outcome: Rotation completed
+- Goal: "Stop and look for a red object"  ← NEW GOAL!
+- Image: Shows bottle still visible, workbench with various items in background
+- Image dimensions: 640x480
+
+**Output**:
+```json
+{
+  "reasoning": {
+    "observation": "GOAL CHANGED! Previous goal was 'approach bottle', now it's 'find red object'. I can see bottle and various items on workbench - need to scan for red objects.",
+    "goal_status": "not started - new goal, need to search for red objects",
+    "affordance_check": "Head scanning is safest way to search. Will pan left to scan workbench area.",
+    "safety_rating": "high"
+  },
+  "semantic_memory": {
+    "spatial_knowledge": "Bottle directly ahead (old target), workbench with multiple objects visible in background",
+    "learned_insights": "Goal changed - previous spatial knowledge about bottle still valid but not relevant to new task",
+    "environment_notes": "Workbench environment: multiple objects, need systematic scan for color identification"
+  },
+  "plan": {
+    "actions": [
+      {
+        "type": "head_position",
+        "parameters": {
+          "pan_degrees": -45.0,
+          "tilt_degrees": 0.0
+        },
+        "description": "Scan left for red objects",
+        "priority": 1
+      }
+    ],
+    "plan_confidence": 0.7,
+    "plan_type": "new"
+  },
+  "explanation": "New goal detected - starting fresh search for red objects by panning camera left"
+}
+```
+
+### Example 6: Learning from Failed Actions
+**Input**:
+- Conversation History:
+  [1] Time: 14:10:05
+      Goal: "Find the bottle"
+      → Semantic Memory: "No bottle visible, indoor open space"
+      → Plan: Rotate right 30 degrees
+      → Outcome: Rotation completed
+  [2] Time: 14:10:20
+      Goal: "Find the bottle"  
+      → Semantic Memory: "Still no bottle, wall visible on right side"
+      → Plan: Rotate right 30 degrees
+      → Outcome: Rotation completed
 - Goal: "Find the bottle"
-- Image: Indoor scene, scanned left but no bottle visible
+- Image: Shows wall on right, open space on left
 - Image dimensions: 640x480
-- Previous action: head_position with pan=-45
 
 **Output**:
 ```json
 {
   "reasoning": {
-    "observation": "No bottle found after panning left. I see furniture and walls but no target. Should continue scanning right side.",
-    "goal_status": "in progress - searching environment",
-    "affordance_check": "Head movement always safe. Scanning right side now.",
+    "observation": "Rotated right twice already (60° total) - still no bottle. Seeing wall on right. This direction is not productive. Should try opposite direction (left) to explore other areas.",
+    "goal_status": "in progress - searching, right direction exhausted",
+    "affordance_check": "Rotation is always safe. Changing strategy - rotate left to explore other direction.",
     "safety_rating": "high"
   },
-  "action": {
-    "type": "head_position",
-    "parameters": {
-      "pan_degrees": 45.0,
-      "tilt_degrees": -75.0
-    }
+  "semantic_memory": {
+    "spatial_knowledge": "Wall on right side, open space visible on left - asymmetric environment",
+    "learned_insights": "Right rotation strategy unproductive (2x attempts, only found wall). Left exploration needed.",
+    "environment_notes": "Environment has wall boundary on right - constrains search space"
   },
-  "explanation": "Pan camera right to complete visual scan of environment"
+  "plan": {
+    "actions": [
+      {
+        "type": "rotate",
+        "parameters": {
+          "angle_degrees": -60.0,
+          "speed": 40.0
+        },
+        "description": "Rotate left to explore new area",
+        "priority": 1
+      }
+    ],
+    "plan_confidence": 0.75,
+    "plan_type": "new"
+  },
+  "explanation": "Previous right rotations unproductive - trying left direction instead"
 }
 ```
 
-### Example 6: Search Exhausted - Rotate Body - Pure Vision
-**Input**:
-- Goal: "Find the bottle"
-- Image: Same view after head scanning left and right, no bottle
-- Image dimensions: 640x480
-- Previous actions: head scanned left and right
-
-**Output**:
-```json
-{
-  "reasoning": {
-    "observation": "I've scanned left and right with my camera but found no bottle. Need to rotate my body to see a completely new area.",
-    "goal_status": "in progress - expanding search radius",
-    "affordance_check": "Rotation safe after head scan complete.",
-    "safety_rating": "high"
-  },
-  "action": {
-    "type": "rotate",
-    "parameters": {
-      "angle_degrees": 60.0,
-      "speed": 40.0
-    }
-  },
-  "explanation": "After head scan, rotate body to explore new viewing angle"
-}
-```
-
-### Example 7: Arbitrary Object Recognition - Pure Vision
-**Input**:
-- Goal: "Find something red"
-- Image: Shows indoor scene with various objects including a red cup on a table
-- Image dimensions: 640x480
-
-**Output**:
-```json
-{
-  "reasoning": {
-    "observation": "I can see a red cup on a table in the right portion of my view. It's the only red object visible and matches the goal.",
-    "goal_status": "in progress - red object found but not centered",
-    "affordance_check": "Rotation safe to center the red cup.",
-    "safety_rating": "high"
-  },
-  "action": {
-    "type": "rotate",
-    "parameters": {
-      "angle_degrees": 30.0,
-      "speed": 40.0
-    }
-  },
-  "explanation": "Rotate right to center the red cup in my view"
-}
-```
-
-### Example 8: Obstacle in Path - Safety First - Pure Vision
-**Input**:
-- Goal: "Move forward"
-- Image: Shows a chair leg and table leg in lower portion of view (bottom 25%)
-- Image dimensions: 640x480
-
-**Output**:
-```json
-{
-  "reasoning": {
-    "observation": "I see furniture legs (chair and table) occupying the lower portion of my view - clear obstacles directly in my forward path.",
-    "goal_status": "blocked - cannot move forward safely",
-    "affordance_check": "Forward movement UNSAFE - obstacles detected in lower 25% of image. Must rotate to avoid.",
-    "safety_rating": "low"
-  },
-  "action": {
-    "type": "rotate",
-    "parameters": {
-      "angle_degrees": 60.0,
-      "speed": 40.0
-    }
-  },
-  "explanation": "Obstacle in path - rotating to find clear route"
-}
-```
 
 ## Important Reminders About Parameters
 - **ALWAYS include parameters** for linear_move, rotate, and head_position actions
