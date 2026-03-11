@@ -603,8 +603,8 @@ Look for objects, obstacles, spatial relationships, and anything relevant to the
             
         elif action_type == 'arc_move':
             goal = ArcMove.Goal()
-            goal.radius_cm = float(params.get('radius_cm', 50.0))
-            goal.angle_degrees = float(params.get('angle_degrees', 45.0))
+            goal.distance_cm = float(params.get('distance_cm', 20.0))
+            goal.arc_factor = float(params.get('arc_factor', 0.5))
             goal.speed = float(params.get('speed', 40.0))
             self.action_in_progress = True
             future = self.arc_client.send_goal_async(goal)

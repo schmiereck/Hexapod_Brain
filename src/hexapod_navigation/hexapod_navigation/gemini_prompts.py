@@ -58,8 +58,8 @@ You can execute these ROS2 Actions:
 3. **arc_move**
    - Description: Move in a curved trajectory (combines forward motion with rotation)
    - Parameters:
-     - radius_cm: float (-200 to 200, positive=right arc, negative=left arc)
-     - angle_degrees: float (-180 to 180, angle to travel along arc)
+     - distance_cm: float (10 to 200, distance to travel along the arc)
+     - arc_factor: float (-1.0 to 1.0, 0.0=straight, positive=right arc, negative=left arc, 1.0=rotate in place)
      - speed: int (0-100, typical: 40)
    - Affordance: Requires clear path in arc direction
    - When to use: Circling around objects, avoiding obstacles while maintaining view, smooth approach
@@ -682,7 +682,7 @@ RESPONSE_SCHEMA = {
                                 "properties": {
                                     "distance_cm": {"type": "number"},
                                     "angle_degrees": {"type": "number"},
-                                    "radius_cm": {"type": "number"},
+                                    "arc_factor": {"type": "number"},
                                     "speed": {"type": "number"},
                                     "pan_degrees": {"type": "number"},
                                     "tilt_degrees": {"type": "number"}
