@@ -26,6 +26,7 @@ setup(
         'console_scripts': [
             'bottle_seeker = hexapod_navigation.bottle_seeker:main',
             'gemini_bridge = hexapod_navigation.gemini_bridge:main',
+            'grog_bridge = hexapod_navigation.grog_bridge:main',
         ],
     },
 )
